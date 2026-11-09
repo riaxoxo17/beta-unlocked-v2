@@ -122,7 +122,7 @@ export default function Play() {
   const embed = isEmbed()
 
   useEffect(() => {
-    if (!g.me && g.state.loaded) nav('/')
+    if (!g.me && g.state.loaded) nav(g.auth === 'facilitator' ? '/facilitator' : g.auth === 'gm' ? '/gm' : '/')
   }, [g.me, g.state.loaded])
   if (!g.me) return <div className="stage" data-room="hq" />
 

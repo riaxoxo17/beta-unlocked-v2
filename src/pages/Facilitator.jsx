@@ -2,7 +2,7 @@ import { RoomIcon } from '../components/art.jsx'
 import { useEffect, useState } from 'react'
 import { useGame } from '../lib/useGame.jsx'
 import { ROOMS, TEAMS, STEPS } from '../lib/config.js'
-import { missionSummary, roomFor, stampsOf, teamPlayers } from '../lib/game.js'
+import { missionSummary, roleFor, roomFor, stampsOf, teamPlayers } from '../lib/game.js'
 import { store } from '../lib/store/index.js'
 import { Btn, ConfirmBtn, Panel, TeamChip, Timer } from '../components/ui.jsx'
 
@@ -53,6 +53,26 @@ const logout = async () => {
   return <FacilitatorDashboard session={session} onLogout={logout} game={g} />
 }
 
+// Read-only view of what the team has written so far in a room, so a facilitator can watch without playing.
+function LiveView({ data, players }) {
+  const names = Object.fromEntries(players.map((p) => [p.id, p.name]))
+  const show = (v) => (Array.isArray(v) ? v.map(show).join(', ') : typeof v === 'boolean' ? 'yes' : typeof v === 'number' && v > 1e11 ? 'done' : typeof v === 'object' && v ? JSON.stringify(v) : String(v))
+  const rows = Object.entries(data || {})
+    .filter(([, v]) => v !== null && v !== '' && !(Array.isArray(v) && !v.length))
+    .map(([k, v]) => [k.split(':').map((part) => names[part] || part).join(' / '), show(v)])
+  if (!rows.length) return <p className="muted" style={{ margin: 0 }}>Nothing entered yet. This view updates by itself as your team works.</p>
+  return (
+    <div style={{ display: 'grid', gap: 6, maxHeight: 360, overflow: 'auto' }}>
+      {rows.map(([k, v]) => (
+        <div key={k} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 2fr', gap: 10, fontSize: 14 }}>
+          <span className="hint">{k}</span>
+          <span style={{ wordBreak: 'break-word' }}>{v}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 const STAGE_TEXT = { clue: 'the clue is on their screens', countdown: 'the countdown is running', name: 'the name is on their screens', done: 'the reveal is finished' }
 
 function FacilitatorDashboard({ session, onLogout, game }) {
@@ -99,7 +119,7 @@ function FacilitatorDashboard({ session, onLogout, game }) {
             </div>
           </div>
           <p className="muted" style={{ marginBottom: 0, marginTop: 14 }}>
-            You guide the experience and keep your team on track. You are not a player and don't need to complete missions.
+            You watch and guide. You are a spectator, not a player, so you never join the missions. You run the controls below for your team.
           </p>
         </Panel>
 
@@ -107,7 +127,7 @@ function FacilitatorDashboard({ session, onLogout, game }) {
           <h3>Team roster ({players.length})</h3>
           {players.length ? (
             <div style={{ display: 'grid', gap: 8 }}>
-              {players.map((p) => <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><b>{p.name}</b><span className="hint">Player</span></div>)}
+              {players.map((p, i) => <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><b>{p.name}</b><span className="hint">{stepInfo.round ? roleFor(i, stepInfo.round).name : 'Player'}</span></div>)}
             </div>
           ) : <p className="muted">Your players haven't checked in yet.</p>}
         </Panel>
@@ -125,6 +145,12 @@ function FacilitatorDashboard({ session, onLogout, game }) {
             <p className="muted" style={{ marginBottom: 0 }}>
               {phase === 'lobby' ? 'The event has not started yet. Your team is at HQ.' : phase === 'transition' ? 'Your team is moving to its next room.' : phase === 'vault' ? 'The team is at the Identity Vault.' : 'Your team is back at headquarters.'}
             </p>
+          )}
+          {room && (
+            <details open style={{ marginTop: 12 }}>
+              <summary style={{ cursor: 'pointer', fontWeight: 600, marginBottom: 8 }}>Watch your team live (read only)</summary>
+              <LiveView data={progress[room]} players={players} />
+            </details>
           )}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
             {['chaos', 'brain', 'fearless', 'ignition'].map((r) => {
