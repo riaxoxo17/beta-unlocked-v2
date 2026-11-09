@@ -1,4 +1,4 @@
-import { DEFAULT_EVENT, KEY_PATTERN, MISSIONS, TEAM_CODES, TEAM_IDS, cleanEventPatch, cleanFieldValue, defaultReveal, deriveReveal, stampsOf } from './logic.ts'
+import { DEFAULT_EVENT, KEY_PATTERN, MISSIONS, TEAM_CODES, TEAM_IDS, cleanEventPatch, cleanFieldValue, defaultReveal, deriveReveal, roomOfTeam, stampsOf } from './logic.ts'
 import type { Repo } from './repo.ts'
 
 export type Req = { headers: Record<string, string | undefined>; body: any; ip: string }
@@ -100,9 +100,14 @@ export function createHandler(repo: Repo, env: Env, clock: () => number = Date.n
   async function dispatch(sess: Session, op: any) {
     if (!op || typeof op !== 'object') throw bad('Bad update.')
     const gm = sess.role === 'gm'
+    // A facilitator acts like a Game Master for their own team, in the room that team is in right now.
+    const facilitatorMay = async (team: unknown, mission: unknown) =>
+      sess.role === 'facilitator' && sess.team_id === team && roomOfTeam(await repo.getEvent(), sess.team_id as string) === mission
     switch (op.type) {
       case 'teamField': {
-        if (!gm && !(sess.role === 'player' && sess.team_id === op.team)) throw new HttpError(403, 'You can only change your own team.')
+        if (!gm && !(sess.role === 'player' && sess.team_id === op.team) && !(await facilitatorMay(op.team, op.mission))) {
+          throw new HttpError(403, sess.role === 'facilitator' ? 'You can only change the room your team is in right now.' : 'You can only change your own team.')
+        }
         if (!TEAM_IDS.includes(op.team) || !MISSIONS.includes(op.mission)) throw bad('Unknown team or room.')
         if (typeof op.key !== 'string' || !KEY_PATTERN.test(op.key)) throw bad('Bad field name.')
         const v = cleanFieldValue(op.value)
@@ -126,7 +131,7 @@ export function createHandler(repo: Repo, env: Env, clock: () => number = Date.n
         return
       }
       case 'resetMission':
-        if (!gm) throw new HttpError(403, 'Only the Game Master can do that.')
+        if (!gm && !(await facilitatorMay(op.team, op.mission))) throw new HttpError(403, 'Only the Game Master, or your team facilitator in the current room, can do that.')
         if (!TEAM_IDS.includes(op.team) || !MISSIONS.includes(op.mission)) throw bad('Unknown team or room.')
         await repo.resetMission(op.team, op.mission)
         return
@@ -172,7 +177,6 @@ export function createHandler(repo: Repo, env: Env, clock: () => number = Date.n
       try {
         joined = await repo.joinPlayer(teamId, String(b.name ?? ''))
       } catch (e: any) {
-        if (String(e.message).includes('team_full')) throw new HttpError(409, 'This team already has five players.')
         if (String(e.message).includes('bad_name')) throw bad('Name must be between 2 and 30 characters.')
         throw e
       }

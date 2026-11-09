@@ -4,7 +4,7 @@ import { useGame } from '../lib/useGame.jsx'
 import { ROOMS, TEAMS, STEPS } from '../lib/config.js'
 import { missionSummary, roomFor, stampsOf, teamPlayers } from '../lib/game.js'
 import { store } from '../lib/store/index.js'
-import { Btn, Panel, TeamChip, Timer } from '../components/ui.jsx'
+import { Btn, ConfirmBtn, Panel, TeamChip, Timer } from '../components/ui.jsx'
 
 export default function Facilitator() {
   const g = useGame()
@@ -36,7 +36,7 @@ const logout = async () => {
     return (
       <div className="stage" data-room="hq" style={{ display: 'grid', placeItems: 'center', padding: 20 }}>
         <form className="panel" style={{ width: 'min(420px, 100%)', padding: 28, background: 'rgba(12,12,24,.9)' }} onSubmit={login}>
-          <div className="hint">BETA: UNLOCKED · ORGANISING TEAM</div>
+          <div className="hint">Beta: Unlocked, organising team</div>
           <h1 style={{ margin: '8px 0' }}>Team Facilitator</h1>
           <p className="muted">Enter the access code assigned to you by the Game Master. You'll only see the team you're looking after.</p>
           <label className="label" htmlFor="fac-code">Facilitator access code</label>
@@ -54,7 +54,8 @@ const logout = async () => {
 }
 
 function FacilitatorDashboard({ session, onLogout, game }) {
-  const { state, ev, stepInfo } = game
+  const { state, ev, stepInfo, dispatch } = game
+  const [hint, setHint] = useState('')
   const team = TEAMS.find((t) => t.id === session.team)
   const players = teamPlayers(state, session.team)
   const progress = state.teams[session.team]?.progress || {}
@@ -67,7 +68,7 @@ function FacilitatorDashboard({ session, onLogout, game }) {
       <header className="hud">
         <div className="wrap" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: '12px 0', flexWrap: 'wrap' }}>
           <div>
-            <div className="hint">BETA: UNLOCKED · TEAM FACILITATOR</div>
+            <div className="hint">Beta: Unlocked, team facilitator</div>
             <h1 style={{ margin: '3px 0', fontSize: 24 }}>Welcome, {session.name || 'Facilitator'}</h1>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -90,12 +91,12 @@ function FacilitatorDashboard({ session, onLogout, game }) {
             </div>
           </div>
           <p className="muted" style={{ marginBottom: 0, marginTop: 14 }}>
-            You're here to guide the experience, keep everyone involved and help your team stay on track. You're not a player and don't need to complete missions.
+            You guide the experience and keep your team on track. You are not a player and don't need to complete missions.
           </p>
         </Panel>
 
         <Panel>
-          <h3>Team roster ({players.length}/5)</h3>
+          <h3>Team roster ({players.length})</h3>
           {players.length ? (
             <div style={{ display: 'grid', gap: 8 }}>
               {players.map((p) => <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><b>{p.name}</b><span className="hint">Player</span></div>)}
@@ -125,6 +126,37 @@ function FacilitatorDashboard({ session, onLogout, game }) {
           </div>
         </Panel>
 
+        <Panel style={{ borderColor: team.color }}>
+          <h3>Controls for this room</h3>
+          {room ? (
+            <>
+              <p className="muted" style={{ marginTop: 0 }}>You can run {team.name} in {ROOMS[room].short} while they are there. The Game Master runs the timer and the other teams.</p>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
+                <Btn variant={stamps.includes(room) ? 'ghost' : undefined} onClick={() => dispatch({ type: 'teamField', team: session.team, mission: room, key: 'stamp', value: stamps.includes(room) ? null : store.now() })}>
+                  {stamps.includes(room) ? 'Take back the stamp' : 'Award the stamp'}
+                </Btn>
+                <ConfirmBtn variant="ghost" onConfirm={() => dispatch({ type: 'resetMission', team: session.team, mission: room })}>
+                  Reset this mission
+                </ConfirmBtn>
+              </div>
+              <form
+                style={{ display: 'flex', gap: 6 }}
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  if (!hint.trim()) return
+                  dispatch({ type: 'teamHint', team: session.team, hint: { id: store.now(), text: hint.trim() } })
+                  setHint('')
+                }}
+              >
+                <input className="input" value={hint} onChange={(e) => setHint(e.target.value)} placeholder="Send a hint to your team" aria-label="Hint to your team" />
+                <Btn small>Send</Btn>
+              </form>
+            </>
+          ) : (
+            <p className="muted" style={{ margin: 0 }}>Controls open when your team is in a room.</p>
+          )}
+        </Panel>
+
         <Panel>
           <h3>Facilitator checklist</h3>
           <ul style={{ margin: 0, paddingLeft: 20, display: 'grid', gap: 7 }}>
@@ -135,7 +167,7 @@ function FacilitatorDashboard({ session, onLogout, game }) {
             <li>Let the players solve the challenge — don't solve it for them!</li>
           </ul>
         </Panel>
-        <p className="hint">This dashboard is read-only in rehearsal mode. Event controls remain with the Game Master.</p>
+        <p className="hint">Start, pause and timer controls stay with the Game Master.</p>
       </main>
     </div>
   )

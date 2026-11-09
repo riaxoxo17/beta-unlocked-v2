@@ -2,6 +2,18 @@
 export const TEAM_CODES: Record<string, string> = { A: 'PURPLE', B: 'TEAL', C: 'GOLD', D: 'RED' }
 export const TEAM_IDS = Object.keys(TEAM_CODES)
 export const MISSIONS = ['chaos', 'brain', 'fearless', 'ignition']
+export const ROOM_ORDER = ['chaos', 'brain', 'fearless', 'ignition']
+
+// The room a team is in right now, or null between rooms. Same rotation as the browser (src/lib/game.js).
+export function roomOfTeam(event: any, team: string): string | null {
+  const step = Number(event?.step ?? 0)
+  const isRound = step >= 1 && step <= 7 && step % 2 === 1
+  if (!isRound) return null
+  const round = (step + 1) / 2
+  const idx = TEAM_IDS.indexOf(team)
+  return idx < 0 ? null : ROOM_ORDER[(idx + round - 1) % ROOM_ORDER.length]
+}
+
 export const STAGES = ['clue', 'countdown', 'name']
 
 export const defaultReveal = () => ({ authorised: false, team: null, stage: null, startedAt: null, done: [] as string[] })

@@ -31,7 +31,7 @@ test('schema runs twice without error (idempotent)', async () => {
   await db.exec(sql)
 })
 
-test('joining: team code, capacity of five, rejoin by name', async () => {
+test('joining: team code, no size limit, rejoin by name', async () => {
   const { call } = await setup()
   assert.equal((await join(call, 'A', 'WRONG', 'Asha')).status, 401)
   const first = await join(call, 'A', 'purple', 'Asha')
@@ -40,8 +40,8 @@ test('joining: team code, capacity of five, rejoin by name', async () => {
   const again = await join(call, 'A', 'PURPLE', 'asha')
   assert.equal(again.body.player.id, first.body.player.id, 'same name rejoins as the same player')
   for (const n of ['Bo', 'Cy', 'Di', 'Ed']) assert.equal((await join(call, 'A', 'PURPLE', n)).status, 200)
-  const sixth = await join(call, 'A', 'PURPLE', 'Fay')
-  assert.equal(sixth.status, 409)
+  for (const n of ['Fay', 'Gus', 'Hia']) assert.equal((await join(call, 'A', 'PURPLE', n)).status, 200)
+  assert.equal((await call({ action: 'publicState' })).body.roster.length, 8)
   assert.equal((await join(call, 'A', 'PURPLE', 'x')).status, 400)
 })
 
@@ -149,6 +149,30 @@ test('vault edit and facilitator flow', async () => {
   // changing the code signs the old session out
   await call({ action: 'facilitatorAssign', team: 'A', name: 'Riya', code: 'fac-a2' }, gm)
   assert.equal((await call({ action: 'getState' }, f.body.token)).status, 401)
+})
+
+test('facilitator controls only their own team, in the room it is in now', async () => {
+  const { call } = await setup()
+  const gm = (await call({ action: 'gmLogin', code: 'secret-gm' }, undefined, 'g')).body.token
+  await call({ action: 'facilitatorAssign', team: 'A', name: 'Riya', code: 'fac-a' }, gm)
+  const f = (await call({ action: 'facilitatorLogin', code: 'fac-a' }, undefined, 'f')).body.token
+  const op = (o) => call({ action: 'dispatch', op: o }, f)
+  const stamp = (team, mission) => op({ type: 'teamField', team, mission, key: 'stamp', value: 1 })
+  // lobby: team A is in no room yet
+  assert.equal((await stamp('A', 'chaos')).status, 403)
+  // round 1: team A is in chaos, team B in brain
+  await call({ action: 'dispatch', op: { type: 'event', patch: { step: 1 } } }, gm)
+  assert.equal((await stamp('A', 'chaos')).status, 200)
+  assert.equal((await stamp('A', 'brain')).status, 403, 'not the room it is in')
+  assert.equal((await stamp('B', 'brain')).status, 403, 'not their team')
+  assert.equal((await op({ type: 'resetMission', team: 'A', mission: 'chaos' })).status, 200)
+  assert.equal((await op({ type: 'resetMission', team: 'B', mission: 'brain' })).status, 403)
+  assert.equal((await op({ type: 'event', patch: { step: 2 } })).status, 403, 'still no event control')
+  assert.equal((await op({ type: 'resetAll' })).status, 403)
+  // round 2: team A moves to brain
+  await call({ action: 'dispatch', op: { type: 'event', patch: { step: 3 } } }, gm)
+  assert.equal((await stamp('A', 'brain')).status, 200)
+  assert.equal((await stamp('A', 'chaos')).status, 403)
 })
 
 test('wrong guesses get blocked even if the right code follows', async () => {
