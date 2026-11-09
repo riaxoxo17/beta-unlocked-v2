@@ -204,6 +204,7 @@ export function createHandler(repo: Repo, env: Env, clock: () => number = Date.n
         joined = await repo.joinPlayer(teamId, String(b.name ?? ''))
       } catch (e: any) {
         if (String(e.message).includes('bad_name')) throw bad('Name must be between 2 and 30 characters.')
+        if (String(e.message).includes('is_facilitator')) throw new HttpError(403, 'That name belongs to a facilitator. Facilitators watch and guide, they do not play. Use the facilitator sign-in instead.')
         throw e
       }
       const p = joined.player

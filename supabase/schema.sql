@@ -223,6 +223,9 @@ begin
   if not found then raise exception 'bad_team'; end if;
   if v_name is null or char_length(v_name) < 2 or char_length(v_name) > 30 then raise exception 'bad_name'; end if;
 
+  -- Facilitators run the game, they never play it.
+  if exists (select 1 from facilitators where lower(btrim(name)) = lower(v_name)) then raise exception 'is_facilitator'; end if;
+
   select * into v_row from players where team = v_team and lower(name) = lower(v_name);
   if found then
     return jsonb_build_object('created', false, 'player',
@@ -291,6 +294,9 @@ begin
   insert into facilitators (team, name, code_hash) values (p ->> 'team', p ->> 'name', p ->> 'code_hash')
   on conflict (team) do update set name = excluded.name, code_hash = excluded.code_hash, updated_at = now();
   delete from beta_sessions where role = 'facilitator' and team_id = p ->> 'team';
+  -- Anyone already in the game under this name is a facilitator, so take them out of the player list.
+  delete from beta_sessions where role = 'player' and player_id in (select id from players where lower(btrim(name)) = lower(btrim(p ->> 'name')));
+  delete from players where lower(btrim(name)) = lower(btrim(p ->> 'name'));
   return 'true'::jsonb;
 exception when unique_violation then
   raise exception 'code_in_use';

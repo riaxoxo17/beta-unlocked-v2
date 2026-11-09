@@ -85,6 +85,9 @@ export function createLocalStore() {
       if (!team || team.code !== String(teamCode || '').trim().toUpperCase()) throw new Error('That team code is not correct.')
       const nm = String(name || '').trim()
       if (nm.length < 2 || nm.length > 30) throw new Error('Name must be between 2 and 30 characters.')
+      if (Object.values(facilitators()).some((f) => (f.name || '').trim().toLowerCase() === nm.toLowerCase())) {
+        throw new Error('That name belongs to a facilitator. Facilitators watch and guide, they do not play. Use the facilitator sign-in instead.')
+      }
       const s = raw()
       const mates = Object.values(s.players).filter((p) => p.team === teamId)
       let player = mates.find((p) => p.name.toLowerCase() === nm.toLowerCase())
@@ -119,6 +122,11 @@ export function createLocalStore() {
       const next = facilitators()
       next[team] = { name: String(name).trim(), code: String(code).trim().toUpperCase() }
       localStorage.setItem(FKEY, JSON.stringify(next))
+      // A facilitator is not a player: drop anyone already in the game under that name.
+      const nm = next[team].name.toLowerCase()
+      const s = raw()
+      Object.values(s.players).filter((p) => p.name.trim().toLowerCase() === nm).forEach((p) => write(applyOp(raw(), { type: 'removePlayer', id: p.id })))
+      emit()
       return true
     },
 

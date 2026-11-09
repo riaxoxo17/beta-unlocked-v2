@@ -98,6 +98,9 @@ export default function Join() {
           {joining ? 'Joining…' : 'Join the game'}
         </Btn>
         <p className="hint" style={{ textAlign: 'center', margin: '12px 0 0' }}>
+          Facilitator? <a href="#/facilitator">Sign in here</a>. Facilitators watch and guide, they do not play.
+        </p>
+        <p className="hint" style={{ textAlign: 'center', margin: '6px 0 0' }}>
           {count ? `${count} players are in.` : 'Rejoining? Use the same team and name.'}
         </p>
       </form>

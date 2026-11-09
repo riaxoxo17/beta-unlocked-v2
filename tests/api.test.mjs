@@ -185,6 +185,7 @@ test('vault edit and facilitator flow', async () => {
   assert.equal((await call({ action: 'facilitatorAssign', team: 'A', name: 'Riya', code: 'ab' }, gm)).status, 400)
   assert.equal((await call({ action: 'facilitatorAssign', team: 'A', name: 'Riya', code: 'fac-a1' }, gm)).status, 200)
   assert.equal((await call({ action: 'facilitatorAssign', team: 'B', name: 'Kunal', code: 'FAC-A1' }, gm)).status, 409, 'codes are unique')
+  assert.equal((await join(call, 'A', 'PURPLE', 'riya')).status, 403, 'a facilitator cannot join as a player')
   assert.equal((await call({ action: 'facilitatorLogin', code: 'nope' }, undefined, 'f1')).status, 401)
   const f = await call({ action: 'facilitatorLogin', code: 'FAC-a1' }, undefined, 'f1')
   assert.equal(f.status, 200); assert.equal(f.body.teamId, 'A')
