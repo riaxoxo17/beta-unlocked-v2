@@ -143,8 +143,8 @@ function Dashboard({ code }) {
         {tab === 'setup' && <Panel>
           <h3 style={{ marginBottom: 12 }}>Reset</h3>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <ConfirmBtn variant="danger" onConfirm={() => dispatch({ type: 'resetProgress' }, code)}>Reset progress, keep players</ConfirmBtn>
-            <ConfirmBtn variant="danger" onConfirm={() => dispatch({ type: 'resetAll' }, code)}>Reset everything</ConfirmBtn>
+            <ConfirmBtn variant="danger" onConfirm={() => dispatch({ type: 'resetProgress' }, code).catch((e) => window.alert('Reset failed: ' + e.message))}>Reset progress, keep players</ConfirmBtn>
+            <ConfirmBtn variant="danger" onConfirm={() => dispatch({ type: 'resetAll' }, code).catch((e) => window.alert('Reset failed: ' + e.message))}>Reset everything</ConfirmBtn>
           </div>
         </Panel>}
       </main>

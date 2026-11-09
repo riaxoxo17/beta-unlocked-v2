@@ -244,7 +244,7 @@ create or replace function api_reset_progress(p jsonb default '{}')
 returns jsonb language plpgsql as $$
 begin
   update event_state set state = '{}'::jsonb, updated_at = now() where id = 1;
-  update team_state set progress = '{"chaos":{},"brain":{},"fearless":{},"ignition":{}}'::jsonb, hint = null;
+  update team_state set progress = '{"chaos":{},"brain":{},"fearless":{},"ignition":{}}'::jsonb, hint = null where id is not null;
   return 'true'::jsonb;
 end $$;
 
@@ -253,7 +253,7 @@ returns jsonb language plpgsql as $$
 begin
   perform api_reset_progress('{}');
   delete from beta_sessions where role <> 'gm';
-  delete from players;
+  delete from players where id is not null;
   return 'true'::jsonb;
 end $$;
 
