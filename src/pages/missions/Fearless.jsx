@@ -2,8 +2,8 @@ import { RoomIcon } from '../../components/art.jsx'
 import { useEffect, useState } from 'react'
 import { useMission } from '../../lib/useGame.jsx'
 import { TEAMS, ROOMS } from '../../lib/config.js'
-import { roomFor, teamIndex } from '../../lib/game.js'
-import { Btn, Field, Panel, SharedField, useAutoStamp } from '../../components/ui.jsx'
+import { roomFor } from '../../lib/game.js'
+import { Btn, Panel, SharedField, useAutoStamp } from '../../components/ui.jsx'
 import { store } from '../../lib/store/index.js'
 import { sfx } from '../../lib/audio.js'
 
@@ -13,12 +13,14 @@ const TRAITS = [
   { id: 'habit', label: 'A similar unusual habit' },
 ]
 
-// The broker holds whatever piece each team is missing. The Game Master (or auto-release) hands it over.
-export const BROKER = [
-  { have: ['Location', 'the Old Clock Tower'], need: ['Time', '6:45 PM'] },
-  { have: ['Time', '6:45 PM'], need: ['Theme', 'Retro Superheroes'] },
-  { have: ['Theme', 'Retro Superheroes'], need: ['Codeword', 'FIREFLY'] },
-  { have: ['Codeword', 'FIREFLY'], need: ['Location', 'the Old Clock Tower'] },
+// Courage dares. Each player dares the next teammate in the ring, who does it out loud.
+export const DARES = [
+  'Tell the team about a mistake you made as a volunteer and what it taught you. 60 seconds.',
+  'Admit one thing about running your chapter that you are unsure about, then ask the team for an idea.',
+  'Give every teammate one specific compliment, out loud, with no jokes.',
+  'Say what you are most nervous about this year and what would help.',
+  'Teach the team one thing you are good at in 60 seconds.',
+  'Describe a moment you were proud of yourself that you never told anyone about.',
 ]
 
 const SCENARIOS = [
@@ -28,8 +30,8 @@ const SCENARIOS = [
     items: ['A phone with 1% battery', 'A suitcase full of money', 'A box of food', 'A first-aid kit', 'A laptop with no internet'],
   },
   {
-    title: 'Ten minutes before the session',
-    text: 'Half your volunteers cancelled, the projector is dead and thirty students are walking in. Choose your three moves.',
+    title: 'Ten minutes before the class starts',
+    text: 'Half of the volunteers cancelled and thirty students are walking in. Choose your three moves.',
     items: ['Merge the groups and run a story circle', 'Call the backup volunteer list', 'Take the session outside', 'Cancel and reschedule', 'Ask older students to co-lead'],
   },
   {
@@ -44,8 +46,6 @@ const sameSet = (a, b) => a.length === b.length && [...a].sort().join('|') === [
 export default function Fearless() {
   const { p, set, players, me, teamId, state } = useMission('fearless')
   const [tab, setTab] = useState(1)
-  const idx = teamIndex(teamId)
-  const broker = BROKER[idx]
 
   // A scenario is settled when every teammate has chosen three items and all choices match.
   const unanimous = (s) => {
@@ -62,7 +62,9 @@ export default function Fearless() {
   }) // eslint-disable-line react-hooks/exhaustive-deps
 
   const c1 = TRAITS.every((t) => (p[`c1:${t.id}:who`] || '').trim() && (p[`c1:${t.id}:what`] || '').trim())
-  const c2 = !!p['c2:received'] && (p['c2:deal'] || '').trim().length > 0
+  // Dare Ring: player i dares player i+1. Done when every dare is chosen and confirmed by the one who set it.
+  const ring = players.map((pl, i) => ({ giver: pl, target: players[(i + 1) % players.length] }))
+  const c2 = ring.length > 0 && ring.every((r) => p[`c2:${r.giver.id}:dare`] && p[`c2:${r.giver.id}:done`])
   const c3 = settled.every(Boolean)
   useAutoStamp(c1 && c2 && c3, p.stamp, set)
 
@@ -74,12 +76,6 @@ export default function Fearless() {
     return info >= 0 ? ROOMS[roomFor(team, info + 1)].short : 'between rooms'
   }
 
-  const offer = () => {
-    sfx.right()
-    set('c2:offerAt', store.now())
-    if (state.event.autoBroker) set('c2:received', broker.need[1])
-  }
-
   return (
     <div style={{ display: 'grid', gap: 16 }}>
       <Panel>
@@ -88,7 +84,7 @@ export default function Fearless() {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} role="tablist">
           {[
             [1, 'Find your match', c1],
-            [2, 'The negotiation', c2],
+            [2, 'The dare ring', c2],
             [3, 'The impossible choice', c3],
           ].map(([n, l, ok]) => (
             <Btn key={n} small variant={tab === n ? 'primary' : 'ghost'} onClick={() => setTab(n)} role="tab" aria-selected={tab === n}>
@@ -132,38 +128,46 @@ export default function Fearless() {
       )}
 
       {tab === 2 && (
-        <Panel>
-          <p style={{ marginTop: 0 }}>
-            Your team holds one piece of a plan. The <b>Broker</b> holds the one you are missing. Make an offer worth trading for.
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, margin: '12px 0' }}>
-            <div className="panel">
-              <div className="hint">We have</div>
-              <b>{broker.have[0]}:</b> {broker.have[1]}
-            </div>
-            <div className="panel">
-              <div className="hint">We need</div>
-              <b>{broker.need[0]}</b>
-              {p['c2:received'] && <span>: {p['c2:received']}</span>}
-            </div>
-          </div>
-          {!p['c2:received'] && (
-            <>
-              <Field label="Your offer to the Broker" htmlFor="offer" hint="The Spokesperson makes the pitch out loud. Write the deal you are offering here.">
-                <SharedField id="offer" rows={3} value={p['c2:offer']} onCommit={(v) => set('c2:offer', v)} disabled={!!p['c2:offerAt']} />
-              </Field>
-              <Btn disabled={!!p['c2:offerAt'] || !(p['c2:offer'] || '').trim()} onClick={offer}>
-                Send offer
-              </Btn>
-              {p['c2:offerAt'] && <p className="hint">Offer sent. The Broker is thinking it over.</p>}
-            </>
-          )}
-          {p['c2:received'] && (
-            <Field label="Close the deal: what did you give and what did you get?" htmlFor="deal">
-              <SharedField id="deal" rows={2} value={p['c2:deal']} onCommit={(v) => set('c2:deal', v)} />
-            </Field>
-          )}
-        </Panel>
+        <div style={{ display: 'grid', gap: 16 }}>
+          <Panel>
+            <p style={{ margin: 0 }}>
+              Sit in a circle. Each of you picks a dare for the teammate <b>after</b> you. They do it out loud, and you confirm it was real. Fearless is saying it anyway.
+            </p>
+          </Panel>
+          {ring.map(({ giver, target }) => {
+            const dare = p[`c2:${giver.id}:dare`]
+            const done = p[`c2:${giver.id}:done`]
+            const iAmGiver = giver.id === me.id
+            const self = giver.id === target.id
+            return (
+              <Panel key={giver.id}>
+                <h3 style={{ fontSize: 18 }}>
+                  {done ? '✓ ' : ''}
+                  {iAmGiver ? 'You dare ' : giver.name + ' dares '}
+                  {self ? 'themselves' : target.id === me.id ? 'you' : target.name}
+                </h3>
+                {!dare && !iAmGiver && <p className="hint">Waiting for {giver.name} to choose a dare.</p>}
+                {!dare && iAmGiver && (
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    {DARES.map((d) => (
+                      <button key={d} className="pick" aria-pressed={false} onClick={() => { sfx.click?.(); set(`c2:${giver.id}:dare`, d) }}>
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {dare && <p style={{ fontWeight: 600 }}>{dare}</p>}
+                {dare && !done && iAmGiver && (
+                  <Btn onClick={() => { sfx.right(); set(`c2:${giver.id}:done`, store.now()) }}>
+                    {self ? 'I did it' : `${target.name} did it`}
+                  </Btn>
+                )}
+                {dare && !done && !iAmGiver && <p className="hint">{giver.name} confirms once {self ? 'it is' : target.id === me.id ? 'you have' : target.name + ' has'} done it.</p>}
+                {done && <p style={{ margin: 0, fontWeight: 600, color: 'var(--ok)' }}>Done.</p>}
+              </Panel>
+            )
+          })}
+        </div>
       )}
 
       {tab === 3 && (

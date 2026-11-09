@@ -26,7 +26,6 @@ export const DEFAULT_EVENT = {
   transitionSeconds: 60,
   hqSeconds: 300,
   auto: false,
-  autoBroker: false,
   reveal: defaultReveal(),
 }
 
@@ -99,7 +98,6 @@ export function cleanEventPatch(patch: any, current: any): { ok: true; value: Re
         out[k] = v
         break
       case 'auto':
-      case 'autoBroker':
         if (typeof v !== 'boolean') return { ok: false, error: `Bad ${k}.` }
         out[k] = v
         break

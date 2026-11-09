@@ -33,7 +33,7 @@ export function teamPlayers(state, teamId) {
 // Roles rotate by one every round.
 export const roleFor = (playerIndex, round) => ROLES[(Math.max(playerIndex, 0) + Math.max(round, 1) - 1) % ROLES.length]
 
-// Items (pitch sections, secret cards) are shared out round-robin, so small rehearsal teams still cover all five.
+// Items (pitch sections, secret cards) are shared out round-robin, so teams of any size cover every item.
 export function ownerIndex(itemIndex, playerCount) {
   return playerCount ? itemIndex % playerCount : 0
 }
@@ -56,9 +56,9 @@ export function missionSummary(mission, p = {}) {
   }
   if (mission === 'fearless') {
     const c1 = ['food', 'weekend', 'habit'].filter((t) => p[`c1:${t}:who`] && p[`c1:${t}:what`]).length
-    const c2 = p['c2:received'] ? 'deal in' : p['c2:offerAt'] ? 'offer sent' : 'no offer'
+    const c2 = Object.keys(p).filter((k) => /^c2:.+:done$/.test(k) && p[k]).length
     const c3 = [0, 1, 2].filter((i) => p[`c3:${i}:done`]).length
-    return p.stamp ? 'Quest complete' : `Matches ${c1}/3, Negotiation ${c2}, Choices ${c3}/3`
+    return p.stamp ? 'Quest complete' : `Matches ${c1}/3, Dares ${c2} done, Choices ${c3}/3`
   }
   if (mission === 'ignition') {
     const fields = ['name', 'purpose', 'act1', 'act2', 'act3', 'tagline', 'pitch'].filter((k) => (p[k] || '').trim()).length

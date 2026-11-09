@@ -12,7 +12,6 @@ export const defaultEvent = () => ({
   transitionSeconds: 60,
   hqSeconds: 300,
   auto: false,
-  autoBroker: false,
   reveal: defaultReveal(),
 })
 

@@ -2,10 +2,9 @@ import { RoomIcon } from '../components/art.jsx'
 import { useEffect, useRef, useState } from 'react'
 import { useGame } from '../lib/useGame.jsx'
 import { ROOMS, ROOM_ORDER, STEPS, TEAMS, COUNTDOWN_SECONDS } from '../lib/config.js'
-import { missionSummary, roleFor, roomFor, stampsOf, stepDuration, teamIndex, teamPlayers } from '../lib/game.js'
+import { missionSummary, roleFor, roomFor, stampsOf, stepDuration, teamPlayers } from '../lib/game.js'
 import { store } from '../lib/store/index.js'
 import { Btn, ConfirmBtn, Panel, Timer } from '../components/ui.jsx'
-import { BROKER } from './missions/Fearless.jsx'
 
 const KEY = 'beta:gm'
 
@@ -115,7 +114,6 @@ function Dashboard({ code }) {
           </div>
           <div style={{ display: 'flex', gap: 22, flexWrap: 'wrap', marginTop: 16, alignItems: 'center' }}>
             <label><input type="checkbox" checked={ev.auto} onChange={(e) => patch({ auto: e.target.checked })} /> Auto-advance rounds and moves (this tab must stay open)</label>
-            <label><input type="checkbox" checked={ev.autoBroker} onChange={(e) => patch({ autoBroker: e.target.checked })} /> Broker releases pieces automatically</label>
             <label>Round <input type="number" min="1" max="15" className="input" style={{ width: 70, display: 'inline-block' }} value={Math.round(ev.roundSeconds / 60)} onChange={(e) => patch({ roundSeconds: Math.max(1, +e.target.value) * 60 })} /> min</label>
             <label>Move <input type="number" min="10" max="300" className="input" style={{ width: 80, display: 'inline-block' }} value={ev.transitionSeconds} onChange={(e) => patch({ transitionSeconds: Math.max(10, +e.target.value) })} /> sec</label>
           </div>
@@ -130,7 +128,6 @@ function Dashboard({ code }) {
 
         {tab === 'run' && (
           <>
-            <BrokerQueue code={code} />
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 18 }}>
               {TEAMS.map((t) => (
                 <TeamCard key={t.id} team={t} code={code} />
@@ -231,34 +228,6 @@ function FacilitatorAssignments({ code }) {
   )
 }
 
-function BrokerQueue({ code }) {
-  const { state, dispatch } = useGame()
-  const waiting = TEAMS.filter((t) => {
-    const f = state.teams[t.id].progress.fearless
-    return f['c2:offerAt'] && !f['c2:received']
-  })
-  if (!waiting.length) return null
-  return (
-    <Panel style={{ borderColor: 'var(--accent)' }}>
-      <h3 style={{ marginBottom: 10 }}>The Broker has offers waiting</h3>
-      {waiting.map((t) => {
-        const b = BROKER[teamIndex(t.id)]
-        return (
-          <div key={t.id} style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', marginBottom: 8 }}>
-            <div>
-              <span className="dot" style={{ '--c': t.color, display: 'inline-block', marginRight: 8 }} />
-              <b>{t.name}</b> wants <b>{b.need[0]}</b>: “{state.teams[t.id].progress.fearless['c2:offer']}”
-            </div>
-            <Btn small onClick={() => dispatch({ type: 'teamField', team: t.id, mission: 'fearless', key: 'c2:received', value: b.need[1] }, code)}>
-              Release {b.need[0]}: {b.need[1]}
-            </Btn>
-          </div>
-        )
-      })}
-    </Panel>
-  )
-}
-
 function TeamCard({ team, code }) {
   const { state, ev, stepInfo, dispatch } = useGame()
   const players = teamPlayers(state, team.id)
@@ -344,7 +313,7 @@ function Vault({ code }) {
     })
   }, [])
 
-  const flag = (key, value) => dispatch({ type: 'revealFlag', key, value })
+  const flag = (key, value) => dispatch({ type: 'revealFlag', key, value }).catch((e) => setSaved(e.message || 'That did not save.'))
   const stage = (team, st) => dispatch({ type: 'reveal', team, stage: st }).catch((e) => setSaved(e.message))
 
   const edit = (t, k, v) => setRows((r) => ({ ...r, [t]: { ...r[t], [k]: v } }))
@@ -426,7 +395,7 @@ function Vault({ code }) {
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <ConfirmBtn variant="ghost" onConfirm={shuffle}>Shuffle which team gets which name</ConfirmBtn>
-            <ConfirmBtn variant="ghost" onConfirm={() => dispatch({ type: 'revealReset' })}>Close all doors again</ConfirmBtn>
+            <ConfirmBtn variant="ghost" onConfirm={() => dispatch({ type: 'revealReset' }).catch((e) => setSaved(e.message))}>Close all doors again</ConfirmBtn>
             <span className="hint" role="status">{saved}</span>
           </div>
         </div>
