@@ -13,7 +13,7 @@ const TRAITS = [
   { id: 'habit', label: 'A similar unusual habit' },
 ]
 
-// Courage dares. Teammates choose one for each player, who does it out loud.
+// Courage dares. Each player dares the next teammate in the ring, who does it out loud.
 export const DARES = [
   'Tell the team about a mistake you made as a volunteer and what it taught you. 60 seconds.',
   'Admit one thing about running your chapter that you are unsure about, then ask the team for an idea.',
@@ -30,8 +30,8 @@ const SCENARIOS = [
     items: ['A phone with 1% battery', 'A suitcase full of money', 'A box of food', 'A first-aid kit', 'A laptop with no internet'],
   },
   {
-    title: 'Ten minutes before the session',
-    text: 'Half your volunteers cancelled, the projector is dead and thirty students are walking in. Choose your three moves.',
+    title: 'Ten minutes before the class starts',
+    text: 'Half of the volunteers cancelled and thirty students are walking in. Choose your three moves.',
     items: ['Merge the groups and run a story circle', 'Call the backup volunteer list', 'Take the session outside', 'Cancel and reschedule', 'Ask older students to co-lead'],
   },
   {
@@ -62,9 +62,9 @@ export default function Fearless() {
   }) // eslint-disable-line react-hooks/exhaustive-deps
 
   const c1 = TRAITS.every((t) => (p[`c1:${t.id}:who`] || '').trim() && (p[`c1:${t.id}:what`] || '').trim())
-  // Dare ring: every player receives one dare. Any teammate can choose it and any teammate except the receiver confirms it,
-  // so one absent player never blocks the team. A solo player can do both.
-  const c2 = players.length > 0 && players.every((pl) => p[`c2:${pl.id}:dare`] && p[`c2:${pl.id}:done`])
+  // Dare Ring: player i dares player i+1. Done when every dare is chosen and confirmed by the one who set it.
+  const ring = players.map((pl, i) => ({ giver: pl, target: players[(i + 1) % players.length] }))
+  const c2 = ring.length > 0 && ring.every((r) => p[`c2:${r.giver.id}:dare`] && p[`c2:${r.giver.id}:done`])
   const c3 = settled.every(Boolean)
   useAutoStamp(c1 && c2 && c3, p.stamp, set)
 
@@ -131,45 +131,38 @@ export default function Fearless() {
         <div style={{ display: 'grid', gap: 16 }}>
           <Panel>
             <p style={{ margin: 0 }}>
-              Sit in a circle. Every player gets one dare, chosen by their teammates. They do it out loud, and a teammate confirms it was real. Fearless is saying it anyway.
+              Sit in a circle. Each of you picks a dare for the teammate <b>after</b> you. They do it out loud, and you confirm it was real. Fearless is saying it anyway.
             </p>
           </Panel>
-          {players.map((target, i) => {
-            const dare = p[`c2:${target.id}:dare`]
-            const done = p[`c2:${target.id}:done`]
-            const iAmTarget = target.id === me.id
-            const alone = players.length === 1
-            const canChoose = !iAmTarget || alone
-            const canConfirm = !iAmTarget || alone
+          {ring.map(({ giver, target }) => {
+            const dare = p[`c2:${giver.id}:dare`]
+            const done = p[`c2:${giver.id}:done`]
+            const iAmGiver = giver.id === me.id
+            const self = giver.id === target.id
             return (
-              <Panel key={target.id}>
+              <Panel key={giver.id}>
                 <h3 style={{ fontSize: 18 }}>
                   {done ? '✓ ' : ''}
-                  Dare for {iAmTarget ? 'you' : target.name}
+                  {iAmGiver ? 'You dare ' : giver.name + ' dares '}
+                  {self ? 'themselves' : target.id === me.id ? 'you' : target.name}
                 </h3>
-                {!dare && !canChoose && <p className="hint">Your teammates are choosing a dare for you.</p>}
-                {!dare && canChoose && (
-                  <>
-                    <p className="hint" style={{ marginTop: 0 }}>Any teammate can choose this one. Pick something that stretches them, not something that embarrasses them.</p>
-                    <div style={{ display: 'grid', gap: 8 }}>
-                      {DARES.map((d) => (
-                        <button key={d} className="pick" aria-pressed={false} onClick={() => set(`c2:${target.id}:dare`, d)}>
-                          {d}
-                        </button>
-                      ))}
-                    </div>
-                  </>
+                {!dare && !iAmGiver && <p className="hint">Waiting for {giver.name} to choose a dare.</p>}
+                {!dare && iAmGiver && (
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    {DARES.map((d) => (
+                      <button key={d} className="pick" aria-pressed={false} onClick={() => { sfx.click?.(); set(`c2:${giver.id}:dare`, d) }}>
+                        {d}
+                      </button>
+                    ))}
+                  </div>
                 )}
                 {dare && <p style={{ fontWeight: 600 }}>{dare}</p>}
-                {dare && !done && canConfirm && (
-                  <Btn onClick={() => { sfx.right(); set(`c2:${target.id}:done`, store.now()) }}>
-                    {iAmTarget ? 'I did it' : `${target.name} did it`}
+                {dare && !done && iAmGiver && (
+                  <Btn onClick={() => { sfx.right(); set(`c2:${giver.id}:done`, store.now()) }}>
+                    {self ? 'I did it' : `${target.name} did it`}
                   </Btn>
                 )}
-                {dare && !done && !canConfirm && <p className="hint">A teammate confirms once you have done it.</p>}
-                {dare && !done && canChoose && !iAmTarget && (
-                  <Btn small variant="ghost" onClick={() => set(`c2:${target.id}:dare`, null)} style={{ marginLeft: 8 }}>Change the dare</Btn>
-                )}
+                {dare && !done && !iAmGiver && <p className="hint">{giver.name} confirms once {self ? 'it is' : target.id === me.id ? 'you have' : target.name + ' has'} done it.</p>}
                 {done && <p style={{ margin: 0, fontWeight: 600, color: 'var(--ok)' }}>Done.</p>}
               </Panel>
             )

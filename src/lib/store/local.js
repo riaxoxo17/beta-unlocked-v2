@@ -28,7 +28,10 @@ export function createLocalStore() {
   const raw = () => ({ ...initialState(), ...readJSON(localStorage, KEY, {}) })
 
   const build = () => {
-    const s = raw()
+    const s0 = raw()
+    // Facilitators never play: hide anyone who shares a facilitator's name.
+    const facNames = new Set(Object.values(facilitators()).map((f) => (f.name || '').trim().toLowerCase()))
+    const s = { ...s0, players: Object.fromEntries(Object.entries(s0.players).filter(([, p]) => !facNames.has((p.name || '').trim().toLowerCase()))) }
     const sess = session()
     const me = !sess
       ? null
@@ -111,6 +114,8 @@ export function createLocalStore() {
       const c = String(code || '').trim().toUpperCase()
       const found = Object.entries(facilitators()).find(([, f]) => f.code && f.code === c)
       if (!found) throw new Error('That facilitator code is not recognised. Check with the Game Master.')
+      const before = session()
+      if (before?.role === 'player' && before.playerId) write(applyOp(raw(), { type: 'removePlayer', id: before.playerId }))
       sessionStorage.setItem(SKEY, JSON.stringify({ role: 'facilitator', team: found[0], name: found[1].name }))
       emit()
       return { team: found[0], teamId: found[0], name: found[1].name }

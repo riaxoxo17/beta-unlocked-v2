@@ -72,7 +72,10 @@ export function createHandler(repo: Repo, env: Env, clock: () => number = Date.n
   }
 
   async function buildState(sess: Session | null) {
-    const [stored, allTeams, allPlayers, vault] = await Promise.all([repo.getEvent(), repo.getTeams(), repo.listPlayers(), vaultMap()])
+    const [stored, allTeams, everyone, vault, facs] = await Promise.all([repo.getEvent(), repo.getTeams(), repo.listPlayers(), vaultMap(), repo.listFacilitators()])
+    // Facilitators run the game and never play it, so they never appear as players, whatever they typed on the join page.
+    const facNames = new Set(facs.map((f: any) => String(f.name ?? '').trim().toLowerCase()))
+    const allPlayers = everyone.filter((p: any) => !facNames.has(String(p.name ?? '').trim().toLowerCase()))
     const event = { ...DEFAULT_EVENT, ...stored, reveal: { ...defaultReveal(), ...(stored.reveal || {}) } }
     const viewerTeam = sess && sess.role !== 'gm' ? (sess.team_id as string) : null
     const derived = deriveReveal(event, vault, viewerTeam, clock())
@@ -217,6 +220,9 @@ export function createHandler(repo: Repo, env: Env, clock: () => number = Date.n
         if (e instanceof HttpError && e.status === 401) throw new HttpError(401, 'That facilitator code is not recognised. Check with the Game Master.')
         throw e
       })
+      // If this browser was signed in as a player, that player entry belongs to the facilitator: take it out of the game.
+      const before = await sessionOf(req)
+      if (before && before.role === 'player' && before.player_id) await repo.removePlayer(before.player_id as string)
       return { token: await issue('facilitator', { teamId: found.team, name: found.name }), teamId: found.team, name: found.name }
     }
 

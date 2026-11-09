@@ -294,3 +294,19 @@ test('client store: url forms, normalising, and a full round trip against the re
   assert.equal(store.getState().me, null)
   assert.equal(normalize({ event: {}, reveal: null }).event.roundSeconds, 420)
 })
+
+test('facilitators never appear as players, even when they joined first', async () => {
+  const { call } = await setup()
+  const gm = (await call({ action: 'gmLogin', code: 'secret-gm' }, undefined, 'g')).body.token
+  // joined as a player under a different name, then signs in as facilitator from the same browser
+  const sam = await join(call, 'A', 'PURPLE', 'Sam R')
+  await call({ action: 'facilitatorAssign', team: 'A', name: 'Samuel', code: 'fac-sam' }, gm)
+  assert.equal((await call({ action: 'getState' }, gm)).body.players.length, 1)
+  assert.equal((await call({ action: 'facilitatorLogin', code: 'fac-sam' }, sam.body.token, 'fs')).status, 200)
+  assert.equal((await call({ action: 'getState' }, gm)).body.players.length, 0, 'the player entry left with the facilitator sign-in')
+  // a player stored under the facilitator name is hidden from every view
+  await call({ action: 'dispatch', op: { type: 'removePlayer', id: 'x' } }, gm)
+  await join(call, 'A', 'PURPLE', 'Asha')
+  const st = (await call({ action: 'getState' }, gm)).body
+  assert.deepEqual(st.players.map((p) => p.name), ['Asha'])
+})

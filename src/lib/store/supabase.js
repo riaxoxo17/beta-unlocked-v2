@@ -60,13 +60,13 @@ export function createSupabaseStore(url, publishableKey, fetchImpl) {
   const setToken = (t) => (t ? sessionStorage.setItem(SESSION_KEY, t) : sessionStorage.removeItem(SESSION_KEY))
   const emit = () => subs.forEach((f) => f(state))
 
-  async function request(action, payload = {}, authed = true) {
+  async function request(action, payload = {}, authed = true, soft = false) {
     const headers = { 'Content-Type': 'application/json', apikey: publishableKey }
     if (authed && getToken()) headers['x-beta-session'] = getToken()
     const res = await doFetch(endpoint, { method: 'POST', headers, body: JSON.stringify({ action, ...payload }) })
     const body = await res.json().catch(() => ({}))
     if (!res.ok) {
-      if (res.status === 401 && authed && getToken()) {
+      if (res.status === 401 && authed && !soft && getToken()) {
         setToken(null)
         state = { ...state, me: null }
         emit()
@@ -106,8 +106,8 @@ export function createSupabaseStore(url, publishableKey, fetchImpl) {
     timer = null
   }
 
-  const signIn = async (action, payload) => {
-    const r = await request(action, payload, false)
+  const signIn = async (action, payload, sendSession = false) => {
+    const r = await request(action, payload, sendSession, true)
     setToken(r.token)
     loading = false
     await refresh()
@@ -153,7 +153,7 @@ export function createSupabaseStore(url, publishableKey, fetchImpl) {
       return true
     },
     async facilitatorLogin(code) {
-      const r = await signIn('facilitatorLogin', { code })
+      const r = await signIn('facilitatorLogin', { code }, true)
       return { team: r.teamId, teamId: r.teamId, name: r.name }
     },
     async joinPlayer(teamId, teamCode, name) {
