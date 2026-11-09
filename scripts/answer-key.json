@@ -1,0 +1,12 @@
+{
+  "b1.cup": ["blue"],
+  "b1.books": ["1"],
+  "b1.clock": ["3:00"],
+  "b1.keylock": ["key"],
+  "b1.next": ["plant"],
+  "b2.locker": ["7"],
+  "b3.book": ["missing-piece"],
+  "b4.code": ["lock"],
+  "b5.seq": ["64"],
+  "b6.final": ["42854"]
+}

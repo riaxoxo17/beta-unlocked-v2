@@ -1,0 +1,142 @@
+import { RoomIcon } from '../components/art.jsx'
+import { useEffect, useState } from 'react'
+import { useGame } from '../lib/useGame.jsx'
+import { ROOMS, TEAMS, STEPS } from '../lib/config.js'
+import { missionSummary, roomFor, stampsOf, teamPlayers } from '../lib/game.js'
+import { store } from '../lib/store/index.js'
+import { Btn, Panel, TeamChip, Timer } from '../components/ui.jsx'
+
+export default function Facilitator() {
+  const g = useGame()
+  const [code, setCode] = useState('')
+  const m = g.state.me
+  const session = m?.role === 'facilitator' ? { team: m.teamId, name: m.name } : null
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+const login = async (e) => {
+  e.preventDefault()
+  setError('')
+  setLoading(true)
+  try {
+    await store.facilitatorLogin(code)
+  } catch (err) {
+    setError(err.message || 'That facilitator code is not recognised. Please check with the Game Master.')
+  } finally {
+    setLoading(false)
+  }
+}
+
+const logout = async () => {
+  await store.logout()
+  setCode('')
+}
+
+  if (!session) {
+    return (
+      <div className="stage" data-room="hq" style={{ display: 'grid', placeItems: 'center', padding: 20 }}>
+        <form className="panel" style={{ width: 'min(420px, 100%)', padding: 28, background: 'rgba(12,12,24,.9)' }} onSubmit={login}>
+          <div className="hint">BETA: UNLOCKED · ORGANISING TEAM</div>
+          <h1 style={{ margin: '8px 0' }}>Team Facilitator</h1>
+          <p className="muted">Enter the access code assigned to you by the Game Master. You'll only see the team you're looking after.</p>
+          <label className="label" htmlFor="fac-code">Facilitator access code</label>
+          <input id="fac-code" className="input" value={code} onChange={(e) => setCode(e.target.value)} autoComplete="off" />
+          {error && <p role="alert" style={{ color: 'var(--bad)' }}>{error}</p>}
+          <Btn style={{ width: '100%', marginTop: 12 }} disabled={loading}>
+            {loading ? 'Verifying...' : 'Open team dashboard'}
+          </Btn>
+        </form>
+      </div>
+    )
+  }
+
+  return <FacilitatorDashboard session={session} onLogout={logout} game={g} />
+}
+
+function FacilitatorDashboard({ session, onLogout, game }) {
+  const { state, ev, stepInfo } = game
+  const team = TEAMS.find((t) => t.id === session.team)
+  const players = teamPlayers(state, session.team)
+  const progress = state.teams[session.team]?.progress || {}
+  const phase = stepInfo.phase
+  const room = phase === 'round' ? roomFor(session.team, stepInfo.round) : null
+  const stamps = stampsOf(state, session.team)
+
+  return (
+    <div className="stage" data-room={room || 'hq'} style={{ paddingBottom: 50 }}>
+      <header className="hud">
+        <div className="wrap" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: '12px 0', flexWrap: 'wrap' }}>
+          <div>
+            <div className="hint">BETA: UNLOCKED · TEAM FACILITATOR</div>
+            <h1 style={{ margin: '3px 0', fontSize: 24 }}>Welcome, {session.name || 'Facilitator'}</h1>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <a className="btn btn-ghost btn-sm" href="#/screen" target="_blank" rel="noreferrer">Open big screen</a>
+            <Btn small variant="ghost" onClick={onLogout}>Log out</Btn>
+          </div>
+        </div>
+      </header>
+      <main className="wrap" style={{ display: 'grid', gap: 16, paddingTop: 18 }}>
+        <Panel style={{ borderColor: team.color }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div>
+              <div className="hint">YOUR ASSIGNED TEAM</div>
+              <h2 style={{ margin: '5px 0' }}>{team.name}</h2>
+              <TeamChip team={team} />
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div className="hint">{stepInfo.label}</div>
+              <Timer endsAt={ev.endsAt} size={36} />
+            </div>
+          </div>
+          <p className="muted" style={{ marginBottom: 0, marginTop: 14 }}>
+            You're here to guide the experience, keep everyone involved and help your team stay on track. You're not a player and don't need to complete missions.
+          </p>
+        </Panel>
+
+        <Panel>
+          <h3>Team roster ({players.length}/5)</h3>
+          {players.length ? (
+            <div style={{ display: 'grid', gap: 8 }}>
+              {players.map((p) => <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><b>{p.name}</b><span className="hint">Player</span></div>)}
+            </div>
+          ) : <p className="muted">Your players haven't checked in yet.</p>}
+        </Panel>
+
+        <Panel>
+          <h3>Mission status</h3>
+          {room ? (
+            <>
+              <div className="hint">{ROOMS[room].tag}</div>
+              <h2 style={{ margin: '6px 0' }}><RoomIcon room={room} size={26} /> {ROOMS[room].title}</h2>
+              <p className="muted">{ROOMS[room].mission}</p>
+              <p><b>Team progress:</b> {missionSummary(room, progress[room] || {})}</p>
+            </>
+          ) : (
+            <p className="muted" style={{ marginBottom: 0 }}>
+              {phase === 'lobby' ? 'The event has not started yet. Your team is at HQ.' : phase === 'transition' ? 'Your team is moving to its next room.' : phase === 'vault' ? 'The team is at the Identity Vault.' : 'Your team is back at headquarters.'}
+            </p>
+          )}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+            {['chaos', 'brain', 'fearless', 'ignition'].map((r) => {
+              const done = Boolean(progress[r]?.stamp)
+              return <span key={r} className="chip" style={{ opacity: done ? 1 : .55 }}>{done ? '✓' : '○'} {ROOMS[r].short}</span>
+            })}
+          </div>
+        </Panel>
+
+        <Panel>
+          <h3>Facilitator checklist</h3>
+          <ul style={{ margin: 0, paddingLeft: 20, display: 'grid', gap: 7 }}>
+            <li>Make sure everyone understands the mission.</li>
+            <li>Encourage quieter teammates to contribute.</li>
+            <li>Keep an eye on the timer and transitions.</li>
+            <li>Help the team organise its ideas and submissions.</li>
+            <li>Let the players solve the challenge — don't solve it for them!</li>
+          </ul>
+        </Panel>
+        <p className="hint">This dashboard is read-only in rehearsal mode. Event controls remain with the Game Master.</p>
+      </main>
+    </div>
+  )
+}
