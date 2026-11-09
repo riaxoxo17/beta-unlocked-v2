@@ -16,11 +16,12 @@ async function setup() {
     const r = await db.query(`select ${fn}($1::jsonb) as r`, [JSON.stringify(params.p ?? {})])
     return r.rows[0].r
   }
-  const handler = createHandler(createRepo(rpc), { gmPasscode: 'secret-gm' })
+  const clock = { t: Date.now() }
+  const handler = createHandler(createRepo(rpc), { gmPasscode: 'secret-gm' }, () => clock.t)
   let n = 0
   const call = async (body, token, ip = '1.1.1.' + (n++ % 200)) =>
     handler({ headers: { 'x-beta-session': token }, body, ip })
-  return { db, call }
+  return { db, call, clock }
 }
 const join = async (call, team, code, name) => call({ action: 'joinPlayer', teamId: team, teamCode: code, name }, undefined, 'same-wifi')
 
@@ -93,35 +94,85 @@ test('simultaneous teammates do not overwrite each other', async () => {
   assert.equal(Object.keys((await call({ action: 'getState' }, t[0])).body.teams[0].progress.brain).length, 4)
 })
 
-test('Game Master: login limits, event control, reveal never leaks early', async () => {
+test('Game Master: login limits and event control', async () => {
   const { call } = await setup()
   assert.equal((await call({ action: 'gmLogin', code: 'nope' }, undefined, '9.9.9.9')).status, 401)
   const gm = (await call({ action: 'gmLogin', code: 'secret-gm' }, undefined, '9.9.9.9')).body.token
   const a = (await join(call, 'A', 'PURPLE', 'Asha')).body
-  const reveal = (r) => call({ action: 'dispatch', op: { type: 'event', patch: { reveal: r } } }, gm)
-  const seeName = async () => JSON.stringify((await call({ action: 'getState' }, a.token)).body).includes('MAST')
-  const pubName = async () => JSON.stringify((await call({ action: 'publicState' })).body).includes('MAST')
-
   assert.equal((await call({ action: 'dispatch', op: { type: 'event', patch: { step: 2, endsAt: 123456 } } }, gm)).status, 200)
   assert.equal((await call({ action: 'getState' }, a.token)).body.event.step, 2)
   assert.equal((await call({ action: 'dispatch', op: { type: 'event', patch: { step: -4 } } }, gm)).status, 400)
   assert.equal((await call({ action: 'dispatch', op: { type: 'event', patch: { hacked: 1 } } }, gm)).status, 400)
+  assert.equal((await call({ action: 'dispatch', op: { type: 'event', patch: { reveal: { final: true } } } }, gm)).status, 400, 'reveal only changes through its own operations')
+})
 
-  await reveal({ team: 'A', stage: 'clue', startedAt: 1000 }) // not authorised yet
-  assert.equal(await seeName(), false)
-  assert.equal((await call({ action: 'getState' }, a.token)).body.reveal, null, 'nothing before authorisation')
-  await reveal({ authorised: true })
-  const clue = (await call({ action: 'getState' }, a.token)).body.reveal
-  assert.equal(clue.stage, 'clue'); assert.ok(clue.clue); assert.equal(clue.name, null)
-  assert.equal(await seeName(), false); assert.equal(await pubName(), false)
-  await reveal({ stage: 'countdown', startedAt: 2000 })
-  assert.equal(await seeName(), false)
-  await reveal({ stage: 'name' })
-  assert.equal(await seeName(), true); assert.equal(await pubName(), true, 'big screen sees the name at the name stage')
-  await reveal({ team: null, stage: null, done: ['A'] })
-  assert.equal((await call({ action: 'getState' }, a.token)).body.revealed.A.name, 'MAST')
-  await reveal({ authorised: false })
-  assert.equal(await seeName(), false, 'turning authorisation off hides everything again')
+test('identity reveal: per team, run by the facilitator, then a finale for everyone', async () => {
+  const { call, clock } = await setup()
+  const gm = (await call({ action: 'gmLogin', code: 'secret-gm' }, undefined, 'g')).body.token
+  for (const [team, code] of [['A', 'fac-a'], ['B', 'fac-b']]) await call({ action: 'facilitatorAssign', team, name: 'F' + team, code }, gm)
+  const fa = (await call({ action: 'facilitatorLogin', code: 'fac-a' }, undefined, 'fa')).body.token
+  const fb = (await call({ action: 'facilitatorLogin', code: 'fac-b' }, undefined, 'fb')).body.token
+  const pa = (await join(call, 'A', 'PURPLE', 'Asha')).body.token
+  const pb = (await join(call, 'B', 'TEAL', 'Bina')).body.token
+  const act = (tok, op) => call({ action: 'dispatch', op }, tok)
+  const st = async (tok) => (await call({ action: 'getState' }, tok)).body
+  const has = async (tok, word) => JSON.stringify(await st(tok)).includes(word)
+  const pub = async (word) => JSON.stringify((await call({ action: 'publicState' })).body).includes(word)
+
+  // not open yet
+  assert.equal((await act(fa, { type: 'reveal', team: 'A', stage: 'clue' })).status, 409)
+  assert.equal((await act(gm, { type: 'revealFlag', key: 'authorised', value: true })).status, 200)
+  // a facilitator can only run their own team, and a player cannot run anything
+  assert.equal((await act(fa, { type: 'reveal', team: 'B', stage: 'clue' })).status, 403)
+  assert.equal((await act(pa, { type: 'reveal', team: 'A', stage: 'clue' })).status, 403)
+  assert.equal((await act(pa, { type: 'revealFlag', key: 'final', value: true })).status, 403)
+  assert.equal((await act(fa, { type: 'revealFlag', key: 'final', value: true })).status, 403)
+  // steps must go in order
+  assert.equal((await act(fa, { type: 'reveal', team: 'A', stage: 'countdown' })).status, 409)
+
+  // team A's clue: only team A sees it
+  assert.equal((await act(fa, { type: 'reveal', team: 'A', stage: 'clue' })).status, 200)
+  assert.equal((await st(pa)).reveal.stage, 'clue'); assert.ok((await st(pa)).reveal.clue)
+  assert.equal((await st(pb)).reveal, null, 'team B sees nothing of A')
+  assert.equal(await has(pb, 'MAST'), false)
+  assert.equal((await st(pb)).revealStatus.A, 'clue')
+  // team B can start at the same time without disturbing A
+  assert.equal((await act(fb, { type: 'reveal', team: 'B', stage: 'clue' })).status, 200)
+  assert.equal((await st(pa)).reveal.stage, 'clue'); assert.equal((await st(pb)).reveal.stage, 'clue')
+
+  // countdown, then the name after the time is up (server clock)
+  assert.equal((await act(fa, { type: 'reveal', team: 'A', stage: 'countdown' })).status, 200)
+  assert.equal(await has(pa, 'MAST'), false, 'no name during the countdown')
+  clock.t += 4000
+  assert.equal(await has(pa, 'MAST'), false, 'still counting down')
+  clock.t += 1500
+  assert.equal((await st(pa)).reveal.stage, 'name'); assert.equal((await st(pa)).reveal.name, 'MAST')
+  assert.equal(await has(pb, 'MAST'), false, 'team B still cannot see it'); assert.equal(await pub('MAST'), false, 'nor the big screen')
+  assert.equal((await act(fa, { type: 'reveal', team: 'A', stage: 'done' })).status, 200)
+  assert.equal((await st(pa)).reveal, null); assert.equal((await st(pa)).revealed.A.name, 'MAST', 'their own door stays open')
+  assert.equal(await has(pb, 'MAST'), false)
+
+  // team B finishes too, then the Game Master shows the finale to everyone
+  await act(fb, { type: 'reveal', team: 'B', stage: 'countdown' }); clock.t += 6000
+  await act(fb, { type: 'reveal', team: 'B', stage: 'done' })
+  assert.equal(await pub('SAKKATH'), false)
+  assert.equal((await act(gm, { type: 'revealFlag', key: 'final', value: true })).status, 200)
+  for (const tok of [pa, pb]) {
+    const s2 = await st(tok)
+    assert.equal(s2.final, true); assert.deepEqual(Object.keys(s2.revealed).sort(), ['A', 'B', 'C', 'D'])
+  }
+  const p2 = (await call({ action: 'publicState' })).body
+  assert.equal(p2.final, true); assert.equal(p2.revealed.C.name, 'BINDAAS'); assert.equal(p2.revealed.D.name, 'BENKI')
+  // switching it off, and closing the reveal, hides everything again
+  await act(gm, { type: 'revealFlag', key: 'final', value: false })
+  assert.equal(await pub('BINDAAS'), false)
+  await act(gm, { type: 'revealFlag', key: 'final', value: true })
+  await act(gm, { type: 'revealFlag', key: 'authorised', value: false })
+  assert.equal(await pub('BINDAAS'), false, 'closing the reveal hides it all')
+  await act(gm, { type: 'revealFlag', key: 'authorised', value: true })
+  await act(gm, { type: 'revealReset' })
+  const after = await st(pa)
+  assert.equal(after.final, false); assert.deepEqual(after.revealed, {}); assert.deepEqual(after.revealStatus, {})
 })
 
 test('vault edit and facilitator flow', async () => {
@@ -206,11 +257,15 @@ test('resetAll clears players and progress', async () => {
 })
 
 test('server and browser reveal rules agree', () => {
-  const vault = { A: { name: 'MAST', tagline: 't', clue: 'c', anthemUrl: 'u' }, B: { name: 'S', tagline: 't2', clue: 'c2', anthemUrl: '' } }
-  for (const authorised of [true, false]) for (const stage of [null, 'clue', 'countdown', 'name']) for (const team of [null, 'A', 'B']) for (const done of [[], ['A'], ['A', 'B']]) {
-    const ev = { reveal: { authorised, team, stage, startedAt: 5, done } }
-    assert.deepEqual(serverDerive(ev, vault), clientDerive(ev, vault), JSON.stringify(ev))
+  const vault = { A: { name: 'MAST', tagline: 't', clue: 'c', anthemUrl: 'u' }, B: { name: 'S', tagline: 't2', clue: 'c2', anthemUrl: '' }, C: { name: 'X', tagline: '', clue: '' }, D: { name: 'Y', tagline: '', clue: '' } }
+  const stages = [undefined, { stage: 'clue', startedAt: 1000 }, { stage: 'countdown', startedAt: 1000 }, { stage: 'name', startedAt: 1000 }, { stage: 'done', startedAt: 1000 }]
+  let n = 0
+  for (const authorised of [true, false]) for (const final of [true, false]) for (const a of stages) for (const b of stages) for (const viewer of [null, 'A', 'B', 'C']) for (const now of [1000, 5999, 6000, 20000]) {
+    const ev = { reveal: { authorised, final, teams: { A: a, B: b } } }
+    assert.deepEqual(serverDerive(ev, vault, viewer, now), clientDerive(ev, vault, viewer, now), JSON.stringify([ev, viewer, now]))
+    n++
   }
+  assert.ok(n > 1000)
 })
 
 test('client store: url forms, normalising, and a full round trip against the real handler', async () => {

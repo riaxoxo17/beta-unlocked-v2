@@ -14,9 +14,10 @@ export function roomOfTeam(event: any, team: string): string | null {
   return idx < 0 ? null : ROOM_ORDER[(idx + round - 1) % ROOM_ORDER.length]
 }
 
-export const STAGES = ['clue', 'countdown', 'name']
+export const STAGES = ['clue', 'countdown', 'name', 'done']
+export const COUNTDOWN_MS = 5000
 
-export const defaultReveal = () => ({ authorised: false, team: null, stage: null, startedAt: null, done: [] as string[] })
+export const defaultReveal = () => ({ authorised: false, teams: {} as Record<string, any>, final: false })
 export const DEFAULT_EVENT = {
   step: 0,
   stepStartedAt: null,
@@ -31,24 +32,41 @@ export const DEFAULT_EVENT = {
 
 type VaultRow = { name: string; tagline: string; clue: string; anthemUrl?: string }
 
-// Same rule as the browser's deriveReveal. The name only leaves the server at the "name" stage,
-// or once the Game Master has marked a door as done.
-export function deriveReveal(event: any, vault: Record<string, VaultRow>) {
-  const rv = { ...defaultReveal(), ...(event.reveal || {}) }
-  const out: { reveal: any; revealed: Record<string, { name: string; tagline: string }> } = { reveal: null, revealed: {} }
+export function stageNow(entry: any, now: number): string | null {
+  if (!entry || !entry.stage) return null
+  if (entry.stage === 'countdown' && now - entry.startedAt >= COUNTDOWN_MS) return 'name'
+  return entry.stage
+}
+
+// Same rule as the browser's deriveReveal (src/lib/store/reducer.js); a test keeps them identical.
+export function deriveReveal(event: any, vault: Record<string, VaultRow>, viewerTeam: string | null = null, now: number = Date.now()) {
+  const rv = { ...defaultReveal(), ...(event.reveal || {}) } as any
+  const out: any = { reveal: null, revealed: {}, revealStatus: {}, final: false }
   if (!rv.authorised) return out
-  for (const t of rv.done || []) if (vault[t]) out.revealed[t] = { name: vault[t].name, tagline: vault[t].tagline }
-  if (rv.team && rv.stage && vault[rv.team]) {
-    const row = vault[rv.team]
-    const atName = rv.stage === 'name'
-    out.reveal = {
-      team: rv.team,
-      stage: rv.stage,
-      startedAt: rv.startedAt,
-      clue: row.clue,
-      name: atName ? row.name : null,
-      tagline: atName ? row.tagline : null,
-      anthemUrl: atName ? row.anthemUrl || null : null,
+  for (const t of TEAM_IDS) {
+    const st = stageNow(rv.teams?.[t], now)
+    if (st) out.revealStatus[t] = st
+  }
+  if (rv.final) {
+    out.final = true
+    for (const [t, row] of Object.entries(vault)) out.revealed[t] = { name: row.name, tagline: row.tagline }
+  }
+  const mine = viewerTeam && rv.teams?.[viewerTeam]
+  const st = mine ? stageNow(mine, now) : null
+  if (st && vault[viewerTeam as string]) {
+    const row = vault[viewerTeam as string]
+    const atName = st === 'name' || st === 'done'
+    if (atName) out.revealed[viewerTeam as string] = { name: row.name, tagline: row.tagline }
+    if (st !== 'done') {
+      out.reveal = {
+        team: viewerTeam,
+        stage: st,
+        startedAt: mine.startedAt,
+        clue: row.clue,
+        name: atName ? row.name : null,
+        tagline: atName ? row.tagline : null,
+        anthemUrl: atName ? row.anthemUrl || null : null,
+      }
     }
   }
   return out
@@ -85,31 +103,6 @@ export function cleanEventPatch(patch: any, current: any): { ok: true; value: Re
         if (typeof v !== 'boolean') return { ok: false, error: `Bad ${k}.` }
         out[k] = v
         break
-      case 'reveal': {
-        const r: any = v
-        if (!r || typeof r !== 'object') return { ok: false, error: 'Bad reveal.' }
-        const merged = { ...defaultReveal(), ...(current?.reveal || {}) } as any
-        for (const [rk, rv] of Object.entries(r)) {
-          if (rk === 'authorised') {
-            if (typeof rv !== 'boolean') return { ok: false, error: 'Bad reveal.' }
-            merged.authorised = rv
-          } else if (rk === 'team') {
-            if (rv !== null && !TEAM_IDS.includes(rv as string)) return { ok: false, error: 'Bad reveal team.' }
-            merged.team = rv
-          } else if (rk === 'stage') {
-            if (rv !== null && !STAGES.includes(rv as string)) return { ok: false, error: 'Bad reveal stage.' }
-            merged.stage = rv
-          } else if (rk === 'startedAt') {
-            if (!isTime(rv)) return { ok: false, error: 'Bad reveal time.' }
-            merged.startedAt = rv
-          } else if (rk === 'done') {
-            if (!Array.isArray(rv) || rv.some((t) => !TEAM_IDS.includes(t))) return { ok: false, error: 'Bad reveal list.' }
-            merged.done = [...new Set(rv as string[])]
-          } else return { ok: false, error: 'Unknown reveal field.' }
-        }
-        out.reveal = merged
-        break
-      }
       default:
         return { ok: false, error: `Unknown event field: ${k}.` }
     }

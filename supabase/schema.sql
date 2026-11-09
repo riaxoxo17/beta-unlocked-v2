@@ -134,6 +134,25 @@ returns jsonb language sql as $$
   returning state
 $$;
 
+-- Change one part of the reveal state (authorised, final, or one team's stage) without touching the rest,
+-- so facilitators revealing at the same moment never overwrite each other.
+create or replace function api_set_reveal(p jsonb)
+returns jsonb language plpgsql as $$
+declare
+  v_path text[] := array(select jsonb_array_elements_text(p -> 'path'));
+  v_value jsonb := coalesce(p -> 'value', 'null'::jsonb);
+begin
+  update event_state
+     set state = jsonb_set(
+           jsonb_set(
+             jsonb_set(state, '{reveal}', coalesce(state -> 'reveal', '{}'::jsonb), true),
+             '{reveal,teams}', coalesce(state #> '{reveal,teams}', '{}'::jsonb), true),
+           array['reveal'] || v_path, v_value, true),
+         updated_at = now()
+   where id = 1;
+  return 'true'::jsonb;
+end $$;
+
 create or replace function api_get_teams(p jsonb default '{}')
 returns jsonb language sql stable as $$
   select coalesce(jsonb_agg(jsonb_build_object('id', id, 'progress', progress, 'hint', hint) order by id), '[]'::jsonb)
@@ -192,7 +211,7 @@ returns jsonb language sql stable as $$
    where (p ->> 'team') is null or team = p ->> 'team'
 $$;
 
--- Add a player, or return the existing one when the same name rejoins. A team holds five.
+-- Add a player, or return the existing one when the same name rejoins. Teams have no size limit.
 create or replace function api_join_player(p jsonb)
 returns jsonb language plpgsql as $$
 declare
@@ -209,8 +228,6 @@ begin
     return jsonb_build_object('created', false, 'player',
       jsonb_build_object('id', v_row.id, 'name', v_row.name, 'team', v_row.team, 'joined_at', v_row.joined_at));
   end if;
-
-  if (select count(*) from players where team = v_team) >= 5 then raise exception 'team_full'; end if;
 
   insert into players (name, team) values (v_name, v_team) returning * into v_row;
   return jsonb_build_object('created', true, 'player',

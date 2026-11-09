@@ -98,7 +98,7 @@ export default function Join() {
           {joining ? 'Joining…' : 'Join the game'}
         </Btn>
         <p className="hint" style={{ textAlign: 'center', margin: '12px 0 0' }}>
-          {count ? `${count} of 20 players are in.` : 'Rejoining? Use the same team and name.'}
+          {count ? `${count} players are in.` : 'Rejoining? Use the same team and name.'}
         </p>
       </form>
     </div>

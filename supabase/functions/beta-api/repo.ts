@@ -7,6 +7,7 @@ export function createRepo(rpc: Rpc) {
   return {
     getEvent: () => call('api_get_event'),
     patchEvent: (patch: unknown) => call('api_patch_event', { patch }),
+    setReveal: (path: string[], value: unknown) => call('api_set_reveal', { path, value }),
     getTeams: (team?: string) => call('api_get_teams', team ? { team } : {}),
     patchTeamField: (team: string, mission: string, key: string, value: unknown) => call('api_patch_team_field', { team, mission, key, value }),
     resetMission: (team: string, mission: string) => call('api_reset_mission', { team, mission }),

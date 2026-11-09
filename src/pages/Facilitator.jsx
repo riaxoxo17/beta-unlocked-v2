@@ -53,9 +53,17 @@ const logout = async () => {
   return <FacilitatorDashboard session={session} onLogout={logout} game={g} />
 }
 
+const STAGE_TEXT = { clue: 'the clue is on their screens', countdown: 'the countdown is running', name: 'the name is on their screens', done: 'the reveal is finished' }
+
 function FacilitatorDashboard({ session, onLogout, game }) {
   const { state, ev, stepInfo, dispatch } = game
   const [hint, setHint] = useState('')
+  const [revealError, setRevealError] = useState('')
+  const revealStage = state.revealStatus?.[session.team] || null
+  const reveal = (stage) => {
+    setRevealError('')
+    dispatch({ type: 'reveal', team: session.team, stage }).catch((e) => setRevealError(e.message))
+  }
   const team = TEAMS.find((t) => t.id === session.team)
   const players = teamPlayers(state, session.team)
   const progress = state.teams[session.team]?.progress || {}
@@ -124,6 +132,26 @@ function FacilitatorDashboard({ session, onLogout, game }) {
               return <span key={r} className="chip" style={{ opacity: done ? 1 : .55 }}>{done ? '✓' : '○'} {ROOMS[r].short}</span>
             })}
           </div>
+        </Panel>
+
+        <Panel style={{ borderColor: team.color }}>
+          <h3>Identity reveal for {team.name}</h3>
+          {!ev.reveal?.authorised ? (
+            <p className="muted" style={{ margin: 0 }}>The Game Master has not opened the reveal yet. Wait for the signal.</p>
+          ) : (
+            <>
+              <p className="muted" style={{ marginTop: 0 }}>
+                Run this when your team stands at its door. Only your team sees the clue and the name. {revealStage ? `Right now: ${STAGE_TEXT[revealStage]}.` : 'Nothing is showing yet.'}
+              </p>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <Btn disabled={['countdown', 'name'].includes(revealStage)} onClick={() => reveal('clue')}>1. Show the clue</Btn>
+                <Btn disabled={revealStage !== 'clue'} onClick={() => reveal('countdown')}>2. Start the countdown</Btn>
+                <Btn variant="ghost" disabled={!['countdown', 'name'].includes(revealStage)} onClick={() => reveal('done')}>3. Finish</Btn>
+              </div>
+              {revealError && <p role="alert" style={{ color: 'var(--bad)', marginBottom: 0 }}>{revealError}</p>}
+              <p className="hint" style={{ marginBottom: 0 }}>When every team has finished, the Game Master shows all four names to everyone.</p>
+            </>
+          )}
         </Panel>
 
         <Panel style={{ borderColor: team.color }}>

@@ -1,9 +1,9 @@
 import { RoomIcon } from '../components/art.jsx'
 import { useGame } from '../lib/useGame.jsx'
 import { ROOMS, ROOM_ORDER, TEAMS } from '../lib/config.js'
-import { roomFor, stampsOf, teamPlayers } from '../lib/game.js'
+import { roomFor, stampsOf, rosterOf } from '../lib/game.js'
 import { Timer } from '../components/ui.jsx'
-import { RevealOverlay, VaultDoors } from '../components/Vault.jsx'
+import { FinalReveal, RevealOverlay, VaultDoors } from '../components/Vault.jsx'
 
 // Share this page on a Meet/Zoom call or pin it in Gather. It shows what everyone should be looking at.
 export default function Screen() {
@@ -27,7 +27,7 @@ export default function Screen() {
         <div style={{ textAlign: 'center', marginTop: '12vh' }}>
           <h2 style={{ fontSize: 'clamp(30px, 6vw, 80px)' }}>Check in at headquarters</h2>
           <p className="muted" style={{ fontSize: 'clamp(16px, 2vw, 26px)' }}>
-            {(state.roster || Object.values(state.players)).length} of 20 players are in.
+            {(state.roster || Object.values(state.players)).length} players are in.
           </p>
         </div>
       )}
@@ -42,7 +42,7 @@ export default function Screen() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span className="dot" style={{ '--c': t.color }} />
                   <b style={{ fontSize: 22 }}>{t.name}</b>
-                  <span className="hint">{teamPlayers(state, t.id).length}/5</span>
+                  <span className="hint">{rosterOf(state, t.id).length} players</span>
                 </div>
                 <div style={{ margin: '14px 0', fontSize: 20 }}>
                   {roomNow ? (
@@ -73,6 +73,7 @@ export default function Screen() {
         </div>
       )}
       <RevealOverlay />
+      <FinalReveal />
     </div>
   )
 }

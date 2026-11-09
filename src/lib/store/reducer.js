@@ -1,7 +1,9 @@
-import { TEAMS } from '../config.js'
+import { TEAMS, COUNTDOWN_SECONDS } from '../config.js'
 
 export const blankProgress = () => ({ chaos: {}, brain: {}, fearless: {}, ignition: {} })
-export const defaultReveal = () => ({ authorised: false, team: null, stage: null, startedAt: null, done: [] })
+// Reveal state. `teams[T]` is { stage: 'clue' | 'countdown' | 'name' | 'done', startedAt } and is run by that team's facilitator.
+// `final` is the Game Master's switch that shows all four names to everyone at once.
+export const defaultReveal = () => ({ authorised: false, teams: {}, final: false })
 export const defaultEvent = () => ({
   step: 0,
   stepStartedAt: null,
@@ -22,8 +24,10 @@ export const initialState = () => ({
   players: {},
   roster: null, // names of every player, for the "who is out there" list
   summary: null, // public per-team stamp summary
-  reveal: null, // what the current reveal stage is allowed to show
-  revealed: {}, // identities of teams whose door is already open
+  reveal: null, // what this viewer's own reveal stage is allowed to show
+  revealed: {}, // names this viewer may see (own team once revealed, everyone after the finale)
+  revealStatus: {}, // stage per team, with no content, for status chips
+  final: false, // the finale is on
 })
 
 export function applyOp(state, op) {
@@ -65,31 +69,62 @@ export function applyOp(state, op) {
       s.players = {}
       break
     }
+    case 'reveal': {
+      const rv = (s.event.reveal = { ...defaultReveal(), ...s.event.reveal })
+      rv.teams = { ...rv.teams, [op.team]: op.stage ? { stage: op.stage, startedAt: op.at ?? Date.now() } : null }
+      break
+    }
+    case 'revealFlag': {
+      const rv = (s.event.reveal = { ...defaultReveal(), ...s.event.reveal })
+      rv[op.key] = !!op.value
+      break
+    }
+    case 'revealReset':
+      s.event.reveal = { ...defaultReveal(), authorised: s.event.reveal?.authorised || false }
+      break
     default:
       break
   }
   return s
 }
 
-// What each reveal stage may show. The name only exists at the "name" stage (or once a door is marked done).
-export function deriveReveal(event, vault) {
-  const rv = event.reveal || defaultReveal()
-  const out = { reveal: null, revealed: {} }
+// A countdown turns into the name by itself once its time is up, so no browser has to keep a timer running.
+export function stageNow(entry, now) {
+  if (!entry || !entry.stage) return null
+  if (entry.stage === 'countdown' && now - entry.startedAt >= COUNTDOWN_SECONDS * 1000) return 'name'
+  return entry.stage
+}
+
+// What a viewer may see. `viewerTeam` is the viewer's own team (null for the public screen and the Game Master).
+// A name leaves the server only at the "name" stage of the viewer's own team, or once the finale is on.
+export function deriveReveal(event, vault, viewerTeam = null, now = Date.now()) {
+  const rv = { ...defaultReveal(), ...(event.reveal || {}) }
+  const out = { reveal: null, revealed: {}, revealStatus: {}, final: false }
   if (!rv.authorised) return out
-  for (const t of rv.done || []) {
-    if (vault[t]) out.revealed[t] = { name: vault[t].name, tagline: vault[t].tagline }
+  for (const t of TEAMS.map((x) => x.id)) {
+    const st = stageNow(rv.teams?.[t], now)
+    if (st) out.revealStatus[t] = st
   }
-  if (rv.team && rv.stage && vault[rv.team]) {
-    const row = vault[rv.team]
-    const atName = rv.stage === 'name'
-    out.reveal = {
-      team: rv.team,
-      stage: rv.stage,
-      startedAt: rv.startedAt,
-      clue: row.clue,
-      name: atName ? row.name : null,
-      tagline: atName ? row.tagline : null,
-      anthemUrl: atName ? row.anthemUrl || null : null,
+  if (rv.final) {
+    out.final = true
+    for (const [t, row] of Object.entries(vault)) out.revealed[t] = { name: row.name, tagline: row.tagline }
+  }
+  const mine = viewerTeam && rv.teams?.[viewerTeam]
+  const st = mine ? stageNow(mine, now) : null
+  if (st && vault[viewerTeam]) {
+    const row = vault[viewerTeam]
+    const atName = st === 'name' || st === 'done'
+    if (atName) out.revealed[viewerTeam] = { name: row.name, tagline: row.tagline }
+    if (st !== 'done') {
+      out.reveal = {
+        team: viewerTeam,
+        stage: st,
+        startedAt: mine.startedAt,
+        clue: row.clue,
+        name: atName ? row.name : null,
+        tagline: atName ? row.tagline : null,
+        anthemUrl: atName ? row.anthemUrl || null : null,
+      }
     }
   }
   return out

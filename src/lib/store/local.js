@@ -2,7 +2,7 @@
 // play different people. It speaks the same interface as the live store, so pages never care which is in use.
 import { applyOp, deriveReveal, initialState } from './reducer.js'
 import { VAULT_DEFAULTS } from '../../content/vaultDefaults.js'
-import { TEAMS } from '../config.js'
+import { TEAMS, COUNTDOWN_SECONDS } from '../config.js'
 
 const KEY = 'beta:state:v2'
 const VKEY = 'beta:vault:v2'
@@ -35,13 +35,22 @@ export function createLocalStore() {
       : sess.role === 'player'
         ? { role: 'player', playerId: sess.playerId, teamId: s.players[sess.playerId]?.team || null }
         : { role: sess.role, playerId: null, teamId: sess.team || null, name: sess.name || null }
-    return { ...s, loaded: true, me, roster: Object.values(s.players), ...deriveReveal(s.event, vault()) }
+    const viewerTeam = me && me.role !== 'gm' ? me.teamId : null
+    return { ...s, loaded: true, me, roster: Object.values(s.players), ...deriveReveal(s.event, vault(), viewerTeam, Date.now()) }
   }
 
   let state = build()
+  let wake = null
   const emit = () => {
     state = build()
     subs.forEach((f) => f(state))
+    // A countdown becomes the name by itself, so wake up when the next one finishes.
+    clearTimeout(wake)
+    const pending = Object.values(raw().event.reveal?.teams || {})
+      .filter((e) => e && e.stage === 'countdown')
+      .map((e) => e.startedAt + COUNTDOWN_SECONDS * 1000 - Date.now())
+      .filter((ms) => ms > 0)
+    if (pending.length) wake = setTimeout(emit, Math.min(...pending) + 20)
   }
   bc && (bc.onmessage = emit)
   window.addEventListener('storage', (e) => e.key && e.key.startsWith('beta:') && emit())
@@ -80,7 +89,6 @@ export function createLocalStore() {
       const mates = Object.values(s.players).filter((p) => p.team === teamId)
       let player = mates.find((p) => p.name.toLowerCase() === nm.toLowerCase())
       if (!player) {
-        //if (mates.length >= 5) throw new Error('This team already has five players.')
         player = { id: uid(), name: nm, team: teamId, joinedAt: Date.now() }
         write(applyOp(s, { type: 'player', player }))
       }

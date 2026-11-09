@@ -38,6 +38,8 @@ export function normalize(raw) {
     roster,
     summary: raw.summary || null,
     revealed: raw.revealed || {},
+    revealStatus: raw.revealStatus || {},
+    final: !!raw.final,
     reveal: r
       ? { team: r.team, stage: r.stage, startedAt: r.startedAt, clue: r.clue ?? null, name: r.name ?? null, tagline: r.tagline ?? null, anthemUrl: r.anthemUrl ?? null }
       : null,

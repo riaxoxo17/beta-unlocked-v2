@@ -93,7 +93,7 @@ function Dashboard({ code }) {
           <b className="pixel" style={{ fontSize: 20 }}>Game Master</b>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <span className="chip">{store.mode === 'supabase' ? 'Live (Supabase)' : 'Rehearsal (local)'}</span>
-            <span className="muted">{playerCount}/20 joined</span>
+            <span className="muted">{playerCount} joined</span>
             <a className="btn btn-ghost btn-sm" href="#/screen" target="_blank" rel="noreferrer">Open big screen</a>
           </div>
         </div>
@@ -329,10 +329,12 @@ function TeamCard({ team, code }) {
 }
 
 function Vault({ code }) {
-  const { ev, dispatch } = useGame()
+  const { ev, state, dispatch } = useGame()
   const [rows, setRows] = useState(null)
   const [saved, setSaved] = useState('')
-  const rv = ev.reveal
+  const authorised = !!ev.reveal?.authorised
+  const status = state.revealStatus || {}
+  const revealedCount = TEAMS.filter((t) => ['name', 'done'].includes(status[t.id])).length
 
   useEffect(() => {
     store.vaultGet().then((data) => {
@@ -342,7 +344,8 @@ function Vault({ code }) {
     })
   }, [])
 
-  const setReveal = (p) => dispatch({ type: 'event', patch: { reveal: { ...store.getState().event.reveal, ...p } } }, code)
+  const flag = (key, value) => dispatch({ type: 'revealFlag', key, value })
+  const stage = (team, st) => dispatch({ type: 'reveal', team, stage: st }).catch((e) => setSaved(e.message))
 
   const edit = (t, k, v) => setRows((r) => ({ ...r, [t]: { ...r[t], [k]: v } }))
   const save = async (t) => {
@@ -372,21 +375,14 @@ function Vault({ code }) {
     setTimeout(() => setSaved(''), 2500)
   }
 
-  const showClue = (t) => setReveal({ team: t, stage: 'clue', startedAt: store.now() })
-  const countdown = (t) => {
-    setReveal({ team: t, stage: 'countdown', startedAt: store.now() })
-    setTimeout(() => setReveal({ team: t, stage: 'name', startedAt: store.getState().event.reveal.startedAt }), COUNTDOWN_SECONDS * 1000 + 300)
-  }
-  const done = (t) => setReveal({ team: null, stage: null, done: [...new Set([...rv.done, t])] })
-
   return (
     <Panel>
       <h3 style={{ marginBottom: 6 }}>Identity vault</h3>
       <p className="hint" style={{ marginTop: 0 }}>
-        Only you can see what is behind each door. Players receive a name only at the moment you reach its stage.
+        Open the reveal, then each team's facilitator runs their own team's clue, countdown and name. You can run any team too. When every team has seen its name, show all four to everyone at once.
       </p>
       <label style={{ display: 'block', margin: '8px 0 14px' }}>
-        <input type="checkbox" checked={rv.authorised} onChange={(e) => setReveal({ authorised: e.target.checked })} /> <b>Reveal authorised</b>
+        <input type="checkbox" checked={authorised} onChange={(e) => flag('authorised', e.target.checked)} /> <b>Reveal open</b> <span className="hint">(facilitators can start only while this is on)</span>
       </label>
       {!rows ? (
         <p className="muted">Loading vault…</p>
@@ -397,8 +393,7 @@ function Vault({ code }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
                 <span className="dot" style={{ '--c': t.color }} />
                 <b>Door {String(t.door).padStart(2, '0')}, {t.name}</b>
-                {rv.done.includes(t.id) && <span className="chip">Revealed</span>}
-                {rv.team === t.id && <span className="chip">On screen: {rv.stage}</span>}
+                {status[t.id] && <span className="chip">{{ clue: 'Clue on their screens', countdown: 'Countdown running', name: 'Name revealed', done: 'Name revealed' }[status[t.id]]}</span>}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
                 <input className="input" aria-label={`Name behind door ${t.door}`} value={rows[t.id]?.name || ''} onChange={(e) => edit(t.id, 'name', e.target.value)} placeholder="Name" />
@@ -407,16 +402,31 @@ function Vault({ code }) {
               <textarea className="input" rows={2} style={{ marginTop: 8 }} aria-label={`Clue for door ${t.door}`} value={rows[t.id]?.clue || ''} onChange={(e) => edit(t.id, 'clue', e.target.value)} placeholder="Cryptic clue shown before the countdown" />
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
                 <Btn small variant="ghost" onClick={() => save(t.id)}>Save</Btn>
-                <Btn small disabled={!rv.authorised} onClick={() => showClue(t.id)}>1. Show clue</Btn>
-                <Btn small disabled={!rv.authorised || rv.team !== t.id} onClick={() => countdown(t.id)}>2. Countdown and reveal</Btn>
-                <Btn small variant="ghost" disabled={rv.team !== t.id} onClick={() => done(t.id)}>3. Finish, return to doors</Btn>
+                <Btn small disabled={!authorised} onClick={() => stage(t.id, 'clue')}>1. Show clue</Btn>
+                <Btn small disabled={!authorised || status[t.id] !== 'clue'} onClick={() => stage(t.id, 'countdown')}>2. Countdown and reveal</Btn>
+                <Btn small variant="ghost" disabled={!['name', 'countdown'].includes(status[t.id])} onClick={() => stage(t.id, 'done')}>3. Finish</Btn>
+                <Btn small variant="ghost" disabled={!status[t.id]} onClick={() => stage(t.id, null)}>Hide for team</Btn>
               </div>
             </div>
           ))}
+          <div className="panel" style={{ borderColor: 'var(--accent, #a855f7)' }}>
+            <h3 style={{ margin: '0 0 6px' }}>The finale</h3>
+            <p className="hint" style={{ marginTop: 0 }}>
+              Shows all four names on every phone and on the big screen at the same moment. {revealedCount} of 4 teams have seen their name.
+            </p>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              {state.final ? (
+                <Btn variant="ghost" onClick={() => flag('final', false)}>Hide the finale</Btn>
+              ) : revealedCount < 4 ? (
+                <ConfirmBtn disabled={!authorised} onConfirm={() => flag('final', true)}>Show all four names anyway</ConfirmBtn>
+              ) : (
+                <Btn disabled={!authorised} onClick={() => flag('final', true)}>Show all four names to everyone</Btn>
+              )}
+            </div>
+          </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <ConfirmBtn variant="ghost" onConfirm={shuffle}>Shuffle which team gets which name</ConfirmBtn>
-            <Btn variant="ghost" onClick={() => setReveal({ team: null, stage: null })}>Hide overlay</Btn>
-            <ConfirmBtn variant="ghost" onConfirm={() => setReveal({ team: null, stage: null, done: [] })}>Close all doors again</ConfirmBtn>
+            <ConfirmBtn variant="ghost" onConfirm={() => dispatch({ type: 'revealReset' })}>Close all doors again</ConfirmBtn>
             <span className="hint" role="status">{saved}</span>
           </div>
         </div>

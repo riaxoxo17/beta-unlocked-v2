@@ -33,6 +33,12 @@ How it is protected: the browser never touches the tables. Every table has row l
 
 Known limits: stamps are awarded by the player's browser (honest-player model, fine for a friendly event). Live state refreshes about every 1.5 seconds, so a change can take a moment to show up on other phones.
 
+## Identity reveal on the night
+
+1. Game Master > Identity reveal > switch on "Reveal open".
+2. Each team's facilitator opens `/#/facilitator` and runs their own team: show the clue, start the countdown (the name appears by itself after 5 seconds), finish. Only that team sees it. The Game Master can run any team too.
+3. When every team has seen its name, the Game Master presses "Show all four names to everyone". All phones and the big screen show the four names together. "Hide the finale" turns it off; "Close all doors again" resets the reveal.
+
 ## Before the event
 
 - Edit the four names, taglines and clues: GM > Identity reveal.

@@ -5,7 +5,7 @@ import { ROLES, ROOMS, TEAMS } from '../lib/config.js'
 import { nav, isEmbed } from '../lib/router.js'
 import { Panel, Timer, Btn, TeamChip } from '../components/ui.jsx'
 import Passport from '../components/Passport.jsx'
-import { RevealOverlay, VaultDoors } from '../components/Vault.jsx'
+import { FinalReveal, RevealOverlay, VaultDoors } from '../components/Vault.jsx'
 import { isMuted, setMuted } from '../lib/audio.js'
 import Chaos from './missions/Chaos.jsx'
 import Brain from './missions/Brain.jsx'
@@ -53,7 +53,7 @@ function Briefing() {
       <Panel>
         <div className="label">How it works</div>
         <ul style={{ margin: 0, paddingLeft: 20, display: 'grid', gap: 6 }}>
-          <li>Your team is five Chapter Leaders. Everyone starts in a different room.</li>
+          <li>Your team is a group of Chapter Leaders. Everyone starts in a different room.</li>
           <li>Each round lasts about seven minutes, then you move on. This page always shows your team's current mission.</li>
           <li>Everyone has a role, and roles rotate every round.</li>
           <li>Your answers are shared. When a teammate types, you all see it.</li>
@@ -84,7 +84,7 @@ function TeamRoster() {
   const { players, me, round } = useGame()
   return (
     <Panel>
-      <div className="label">Your team ({players.length}/5)</div>
+      <div className="label">Your team ({players.length})</div>
       <div style={{ display: 'grid', gap: 6 }}>
         {players.map((p, i) => (
           <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -213,6 +213,7 @@ export default function Play() {
         )}
       </main>
       <RevealOverlay />
+      <FinalReveal />
     </div>
   )
 }

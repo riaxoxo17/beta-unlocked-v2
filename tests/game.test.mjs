@@ -45,17 +45,34 @@ test('reducer writes and clears team fields', () => {
 })
 
 test('reveal payload never leaks the name early', () => {
-  const vault = { A: { name: 'MAST', tagline: 't', clue: 'c', anthemUrl: 'u' }, B: { name: 'SAKKATH', tagline: 't2', clue: 'c2' } }
+  const vault = { A: { name: 'MAST', tagline: 't', clue: 'c', anthemUrl: 'u' }, B: { name: 'SAKKATH', tagline: 't2', clue: 'c2' }, C: { name: 'X', tagline: '', clue: '' }, D: { name: 'Y', tagline: '', clue: '' } }
   const ev = (reveal) => ({ reveal })
-  const base = { authorised: true, team: 'A', stage: 'clue', startedAt: 1, done: [] }
-  assert.equal(deriveReveal(ev({ ...base, authorised: false }), vault).reveal, null)
-  assert.equal(deriveReveal(ev(base), vault).reveal.name, null)
-  assert.equal(deriveReveal(ev(base), vault).reveal.clue, 'c')
-  assert.equal(deriveReveal(ev({ ...base, stage: 'countdown' }), vault).reveal.name, null)
-  assert.equal(deriveReveal(ev({ ...base, stage: 'name' }), vault).reveal.name, 'MAST')
-  assert.equal(deriveReveal(ev({ ...base, stage: 'clue' }), vault).reveal.anthemUrl, null)
-  const doneOnly = deriveReveal(ev({ ...base, team: null, stage: null, done: ['B'] }), vault)
-  assert.equal(doneOnly.reveal, null)
-  assert.equal(doneOnly.revealed.B.name, 'SAKKATH')
-  assert.equal(doneOnly.revealed.A, undefined)
+  const T0 = 1000
+  const on = { authorised: true, final: false, teams: {} }
+  // nothing before the reveal is open
+  assert.equal(deriveReveal(ev({ ...on, authorised: false, teams: { A: { stage: 'clue', startedAt: T0 } } }), vault, 'A', T0).reveal, null)
+  // a team sees only its own clue; other teams see nothing
+  const clue = { ...on, teams: { A: { stage: 'clue', startedAt: T0 } } }
+  assert.equal(deriveReveal(ev(clue), vault, 'A', T0).reveal.clue, 'c')
+  assert.equal(deriveReveal(ev(clue), vault, 'A', T0).reveal.name, null)
+  assert.equal(deriveReveal(ev(clue), vault, 'B', T0).reveal, null)
+  assert.equal(deriveReveal(ev(clue), vault, null, T0).reveal, null)
+  assert.deepEqual(deriveReveal(ev(clue), vault, 'B', T0).revealStatus, { A: 'clue' })
+  // the countdown turns into the name by itself after 5 seconds
+  const cd = { ...on, teams: { A: { stage: 'countdown', startedAt: T0 } } }
+  assert.equal(deriveReveal(ev(cd), vault, 'A', T0 + 4900).reveal.stage, 'countdown')
+  assert.equal(deriveReveal(ev(cd), vault, 'A', T0 + 4900).reveal.name, null)
+  assert.equal(deriveReveal(ev(cd), vault, 'A', T0 + 5000).reveal.name, 'MAST')
+  assert.equal(deriveReveal(ev(cd), vault, 'A', T0 + 5000).reveal.anthemUrl, 'u')
+  // other teams never see A's name before the finale
+  const other = deriveReveal(ev(cd), vault, 'B', T0 + 9000)
+  assert.equal(other.reveal, null); assert.deepEqual(other.revealed, {})
+  // finished: no overlay, own door stays open
+  const done = deriveReveal(ev({ ...on, teams: { A: { stage: 'done', startedAt: T0 } } }), vault, 'A', T0 + 9000)
+  assert.equal(done.reveal, null); assert.equal(done.revealed.A.name, 'MAST'); assert.equal(done.revealed.B, undefined)
+  // finale: everyone, even the public screen, sees all four
+  const fin = deriveReveal(ev({ ...on, final: true }), vault, null, T0)
+  assert.equal(fin.final, true); assert.deepEqual(Object.keys(fin.revealed).sort(), ['A', 'B', 'C', 'D'])
+  // finale needs the reveal to be open
+  assert.deepEqual(deriveReveal(ev({ authorised: false, final: true, teams: {} }), vault, null, T0).revealed, {})
 })

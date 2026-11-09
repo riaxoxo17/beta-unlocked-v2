@@ -74,9 +74,10 @@ export function createHandler(repo: Repo, env: Env, clock: () => number = Date.n
   async function buildState(sess: Session | null) {
     const [stored, allTeams, allPlayers, vault] = await Promise.all([repo.getEvent(), repo.getTeams(), repo.listPlayers(), vaultMap()])
     const event = { ...DEFAULT_EVENT, ...stored, reveal: { ...defaultReveal(), ...(stored.reveal || {}) } }
-    const derived = deriveReveal(event, vault)
+    const viewerTeam = sess && sess.role !== 'gm' ? (sess.team_id as string) : null
+    const derived = deriveReveal(event, vault, viewerTeam, clock())
     const summary = Object.fromEntries(allTeams.map((t: any) => [t.id, { stamps: stampsOf(t.progress) }]))
-    const base = { serverNow: clock(), event, summary, reveal: derived.reveal, revealed: derived.revealed }
+    const base = { serverNow: clock(), event, summary, reveal: derived.reveal, revealed: derived.revealed, revealStatus: derived.revealStatus, final: derived.final }
 
     if (!sess) {
       return { ...base, me: null, teams: [], players: [], roster: allPlayers.map((p: any) => ({ id: p.id, team: p.team, name: '', joined_at: p.joined_at })) }
@@ -130,6 +131,31 @@ export function createHandler(repo: Repo, env: Env, clock: () => number = Date.n
         await repo.patchEvent(cleaned.value)
         return
       }
+      case 'reveal': {
+        // Show clue, start the countdown, or finish, for one team. Run by that team's facilitator or the Game Master.
+        if (!TEAM_IDS.includes(op.team)) throw bad('Unknown team.')
+        if (!gm && !(sess.role === 'facilitator' && sess.team_id === op.team)) throw new HttpError(403, 'Only your team facilitator or the Game Master can reveal for this team.')
+        if (op.stage !== null && !['clue', 'countdown', 'done'].includes(op.stage)) throw bad('Bad reveal stage.')
+        const rv = { ...defaultReveal(), ...((await repo.getEvent()).reveal || {}) } as any
+        if (!rv.authorised) throw new HttpError(409, 'The Game Master has not opened the reveal yet.')
+        const current = rv.teams?.[op.team]?.stage ?? null
+        if (!gm) {
+          const ok = op.stage === null || (op.stage === 'clue' && current !== 'countdown' && current !== 'name') || (op.stage === 'countdown' && current === 'clue') || (op.stage === 'done' && (current === 'name' || current === 'countdown'))
+          if (!ok) throw new HttpError(409, 'Do the reveal steps in order: clue, countdown, then finish.')
+        }
+        await repo.setReveal(['teams', op.team], op.stage ? { stage: op.stage, startedAt: clock() } : null)
+        return
+      }
+      case 'revealFlag':
+        if (!gm) throw new HttpError(403, 'Only the Game Master can do that.')
+        if (!['authorised', 'final'].includes(op.key) || typeof op.value !== 'boolean') throw bad('Bad reveal setting.')
+        await repo.setReveal([op.key], op.value)
+        return
+      case 'revealReset':
+        if (!gm) throw new HttpError(403, 'Only the Game Master can do that.')
+        await repo.setReveal(['teams'], {})
+        await repo.setReveal(['final'], false)
+        return
       case 'resetMission':
         if (!gm && !(await facilitatorMay(op.team, op.mission))) throw new HttpError(403, 'Only the Game Master, or your team facilitator in the current room, can do that.')
         if (!TEAM_IDS.includes(op.team) || !MISSIONS.includes(op.mission)) throw bad('Unknown team or room.')
