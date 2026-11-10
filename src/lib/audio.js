@@ -29,10 +29,10 @@ function note(freq, start, dur, type = 'square', gain = 0.06) {
   o.stop(c.currentTime + start + dur + 0.05)
 }
 
-const play = (fn) => () => {
+const play = (fn) => (...args) => {
   if (muted()) return
   try {
-    fn()
+    fn(...args)
   } catch {
     /* audio is optional */
   }
@@ -40,6 +40,18 @@ const play = (fn) => () => {
 
 export const sfx = {
   tick: play(() => note(880, 0, 0.09, 'square', 0.05)),
+  // Last ten seconds: one tick a second, higher and doubled in the final three.
+  countdown: play((n = 10) => {
+    note(n <= 3 ? 1175 : 880, 0, 0.1, 'square', n <= 3 ? 0.08 : 0.05)
+    if (n <= 3) note(1175, 0.14, 0.1, 'square', 0.08)
+  }),
+  // Time is up: a long two-tone horn.
+  horn: play(() => {
+    note(220, 0, 0.9, 'sawtooth', 0.12)
+    note(165, 0.05, 0.9, 'sawtooth', 0.1)
+    note(220, 1.0, 0.9, 'sawtooth', 0.12)
+    note(165, 1.05, 0.9, 'sawtooth', 0.1)
+  }),
   wrong: play(() => {
     note(180, 0, 0.18, 'sawtooth', 0.06)
     note(140, 0.12, 0.22, 'sawtooth', 0.06)

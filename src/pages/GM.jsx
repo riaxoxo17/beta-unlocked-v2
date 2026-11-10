@@ -66,7 +66,7 @@ function Dashboard({ code }) {
     const i = Math.max(0, Math.min(last, n))
     const dur = stepDuration(i, ev)
     const now = store.now()
-    dispatch({ type: 'event', patch: { step: i, stepStartedAt: now, endsAt: dur ? now + dur * 1000 : null } }, code)
+    dispatch({ type: 'event', patch: { step: i, stepStartedAt: now, endsAt: dur ? now + dur * 1000 : null, pausedAt: null } }, code)
   }
 
   // Optional auto-advance, only while this dashboard stays open.
@@ -76,7 +76,7 @@ function Dashboard({ code }) {
     const id = setInterval(() => {
       const { ev: e, goStep: go } = stateRef.current
       const ph = STEPS[e.step].phase
-      if (e.auto && e.endsAt && store.now() > e.endsAt && (ph === 'round' || ph === 'transition')) go(e.step + 1)
+      if (e.auto && e.endsAt && !e.pausedAt && store.now() > e.endsAt && (ph === 'round' || ph === 'transition')) go(e.step + 1)
     }, 1000)
     return () => clearInterval(id)
   }, [])
@@ -105,9 +105,12 @@ function Dashboard({ code }) {
               <div className="hint">Now ({ev.step + 1}/{STEPS.length})</div>
               <h2>{stepInfo.label}</h2>
             </div>
-            <Timer endsAt={ev.endsAt} size={44} />
+            <Timer endsAt={ev.endsAt} pausedAt={ev.pausedAt} size={44} />
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <Btn variant="ghost" disabled={ev.step === 0} onClick={() => goStep(ev.step - 1)}>Back</Btn>
+              <Btn variant="ghost" disabled={!ev.endsAt} onClick={() => (ev.pausedAt ? patch({ endsAt: ev.endsAt + (store.now() - ev.pausedAt), pausedAt: null }) : patch({ pausedAt: store.now() }))}>
+                {ev.pausedAt ? 'Resume timer' : 'Pause timer'}
+              </Btn>
               <Btn variant="ghost" disabled={!ev.endsAt} onClick={() => patch({ endsAt: ev.endsAt + 60000 })}>+1 min</Btn>
               <Btn disabled={ev.step === last} onClick={() => goStep(ev.step + 1)}>Next: {nextLabel}</Btn>
             </div>

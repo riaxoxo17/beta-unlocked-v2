@@ -3,12 +3,14 @@ import { useGame } from '../lib/useGame.jsx'
 import { ROOMS, ROOM_ORDER, TEAMS } from '../lib/config.js'
 import { roomFor, stampsOf, rosterOf } from '../lib/game.js'
 import { Timer } from '../components/ui.jsx'
+import { useTimerAlerts } from '../lib/time.js'
 import { FinalReveal, RevealOverlay, VaultDoors } from '../components/Vault.jsx'
 
 // Share this page on a Meet/Zoom call or pin it in Gather. It shows what everyone should be looking at.
 export default function Screen() {
   const { state, ev, stepInfo } = useGame()
   const phase = stepInfo.phase
+  useTimerAlerts(ev)
   return (
     <div className="stage" data-room="hq" style={{ padding: '24px 4vw 40px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
@@ -19,7 +21,7 @@ export default function Screen() {
           <span style={{ fontSize: 'clamp(18px, 2.4vw, 30px)' }} className="muted">
             {stepInfo.label}
           </span>
-          <Timer endsAt={ev.endsAt} size={64} />
+          <Timer endsAt={ev.endsAt} pausedAt={ev.pausedAt} size={64} />
         </div>
       </div>
 

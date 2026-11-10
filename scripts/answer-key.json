@@ -1,3 +1,4 @@
+
 {
   "b1.cup": ["blue"],
   "b1.books": ["1"],
@@ -6,6 +7,7 @@
   "b1.next": ["plant"],
   "b2.locker": ["7"],
   "b3.book": ["missing-piece"],
+  "b4.code": ["3142"],
   "b6.final": ["42854"],
   "b1.compass-direction": ["N"],
   "b1.tower": ["spike"],

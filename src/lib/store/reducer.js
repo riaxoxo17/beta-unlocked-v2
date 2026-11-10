@@ -8,6 +8,7 @@ export const defaultEvent = () => ({
   step: 0,
   stepStartedAt: null,
   endsAt: null,
+  pausedAt: null,
   roundSeconds: 420,
   transitionSeconds: 60,
   hqSeconds: 300,

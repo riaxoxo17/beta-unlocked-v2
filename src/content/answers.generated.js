@@ -21,6 +21,9 @@ export const HASHES = {
   "b3.book": [
     "1zgr0h66gvo"
   ],
+  "b4.code": [
+    "pzm34l1rp9"
+  ],
   "b6.final": [
     "1b7hks6tqc7"
   ],

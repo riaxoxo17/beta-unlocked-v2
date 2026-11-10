@@ -14,6 +14,14 @@ export function roomOfTeam(event: any, team: string): string | null {
   return idx < 0 ? null : ROOM_ORDER[(idx + round - 1) % ROOM_ORDER.length]
 }
 
+// True once a round's timer has run out (and is not paused). Players cannot write after this, so time is a hard stop.
+export const HARD_STOP_GRACE_MS = 2000
+export function roundIsOver(event: any, now: number): boolean {
+  const step = Number(event?.step ?? 0)
+  const isRound = step >= 1 && step <= 7 && step % 2 === 1
+  return isRound && typeof event?.endsAt === 'number' && !event?.pausedAt && now > event.endsAt + HARD_STOP_GRACE_MS
+}
+
 export const STAGES = ['clue', 'countdown', 'name', 'done']
 export const COUNTDOWN_MS = 5000
 
@@ -22,6 +30,7 @@ export const DEFAULT_EVENT = {
   step: 0,
   stepStartedAt: null,
   endsAt: null,
+  pausedAt: null,
   roundSeconds: 420,
   transitionSeconds: 60,
   hqSeconds: 300,
@@ -88,6 +97,7 @@ export function cleanEventPatch(patch: any, current: any): { ok: true; value: Re
         break
       case 'stepStartedAt':
       case 'endsAt':
+      case 'pausedAt':
         if (!isTime(v)) return { ok: false, error: `Bad ${k}.` }
         out[k] = v
         break

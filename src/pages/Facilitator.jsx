@@ -115,7 +115,7 @@ function FacilitatorDashboard({ session, onLogout, game }) {
             </div>
             <div style={{ textAlign: 'right' }}>
               <div className="hint">{stepInfo.label}</div>
-              <Timer endsAt={ev.endsAt} size={36} />
+              <Timer endsAt={ev.endsAt} pausedAt={ev.pausedAt} size={36} />
             </div>
           </div>
           <p className="muted" style={{ marginBottom: 0, marginTop: 14 }}>

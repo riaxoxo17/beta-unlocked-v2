@@ -310,3 +310,37 @@ test('facilitators never appear as players, even when they joined first', async 
   const st = (await call({ action: 'getState' }, gm)).body
   assert.deepEqual(st.players.map((p) => p.name), ['Asha'])
 })
+
+test('find your match: each player keeps their own entries', async () => {
+  const { call } = await setup()
+  const a = await join(call, 'A', 'PURPLE', 'Asha')
+  const b = await join(call, 'A', 'PURPLE', 'Ben')
+  const put = (who, key, value) => call({ action: 'dispatch', op: { type: 'teamField', team: 'A', mission: 'fearless', key, value } }, who.body.token)
+  assert.equal((await put(a, `c1:food:who:${a.body.player.id}`, 'Riya')).status, 200)
+  assert.equal((await put(b, `c1:food:who:${b.body.player.id}`, 'Kunal')).status, 200)
+  const st = (await call({ action: 'getState' }, a.body.token)).body
+  const f = st.teams[0].progress.fearless
+  assert.equal(f[`c1:food:who:${a.body.player.id}`], 'Riya')
+  assert.equal(f[`c1:food:who:${b.body.player.id}`], 'Kunal')
+})
+
+test('timer: players are stopped when time is up, the Game Master can pause and resume', async () => {
+  const { call, clock } = await setup()
+  const gm = (await call({ action: 'gmLogin', code: 'secret-gm' }, undefined, 'g')).body.token
+  const a = await join(call, 'A', 'PURPLE', 'Asha')
+  const write = (v) => call({ action: 'dispatch', op: { type: 'teamField', team: 'A', mission: 'chaos', key: 'x', value: v } }, a.body.token)
+  const t0 = clock.t
+  assert.equal((await call({ action: 'dispatch', op: { type: 'event', patch: { step: 1, stepStartedAt: t0, endsAt: t0 + 10000, pausedAt: null } } }, gm)).status, 200)
+  assert.equal((await write('one')).status, 200)
+  clock.t = t0 + 20000
+  assert.equal((await write('two')).status, 403, 'hard stop once the timer is over')
+  // pause freezes it, and the Game Master can extend and resume
+  assert.equal((await call({ action: 'dispatch', op: { type: 'event', patch: { endsAt: t0 + 60000 } } }, gm)).status, 200)
+  assert.equal((await write('three')).status, 200)
+  assert.equal((await call({ action: 'dispatch', op: { type: 'event', patch: { pausedAt: clock.t } } }, gm)).status, 200)
+  clock.t = t0 + 90000
+  assert.equal((await write('four')).status, 200, 'paused timers never stop play')
+  assert.equal((await call({ action: 'dispatch', op: { type: 'event', patch: { endsAt: t0 + 60000 + 70000, pausedAt: null } } }, gm)).status, 200)
+  assert.equal((await write('five')).status, 200)
+  assert.equal((await call({ action: 'dispatch', op: { type: 'event', patch: { pausedAt: 'x' } } }, gm)).status, 400)
+})

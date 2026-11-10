@@ -12,6 +12,7 @@ import Brain from './missions/Brain.jsx'
 import Fearless from './missions/Fearless.jsx'
 import Ignition from './missions/Ignition.jsx'
 import { roleFor } from '../lib/game.js'
+import { useTimerAlerts, useTimeUp } from '../lib/time.js'
 
 const MISSIONS = { chaos: Chaos, brain: Brain, fearless: Fearless, ignition: Ignition }
 
@@ -110,7 +111,7 @@ function Transition() {
       <p className="muted" style={{ marginTop: 0 }}>
         Head there together. Roles rotate, so check yours when you arrive.
       </p>
-      <Timer endsAt={ev.endsAt} size={48} />
+      <Timer endsAt={ev.endsAt} pausedAt={ev.pausedAt} size={48} />
     </Panel>
   )
 }
@@ -120,6 +121,8 @@ export default function Play() {
   const [tab, setTab] = useState('mission')
   const [muted, setM] = useState(isMuted())
   const embed = isEmbed()
+  useTimerAlerts(g.ev)
+  const timeUp = useTimeUp(g.ev)
 
   useEffect(() => {
     if (!g.me && g.state.loaded) nav(g.auth === 'facilitator' ? '/facilitator' : g.auth === 'gm' ? '/gm' : '/')
@@ -148,7 +151,7 @@ export default function Play() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <span className="hint hud-step">{g.stepInfo.label}</span>
-            <Timer endsAt={g.ev.endsAt} />
+            <Timer endsAt={g.ev.endsAt} pausedAt={g.ev.pausedAt} />
             <button className="btn btn-ghost btn-sm" onClick={() => (setMuted(!muted), setM(!muted))} aria-label={muted ? 'Unmute sounds' : 'Mute sounds'}>
               {muted ? '🔇' : '🔊'}
             </button>
@@ -212,6 +215,14 @@ export default function Play() {
           </>
         )}
       </main>
+      {phase === 'round' && timeUp && (
+        <div className="timeup" role="alert">
+          <div>
+            <h1 className="pixel" style={{ fontSize: 'clamp(40px, 10vw, 96px)', color: 'var(--bad)' }}>Time is up</h1>
+            <p className="muted" style={{ fontSize: 20 }}>Hands off. Wait for the Game Master to move everyone on.</p>
+          </div>
+        </div>
+      )}
       <RevealOverlay />
       <FinalReveal />
     </div>

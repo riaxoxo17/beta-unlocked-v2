@@ -1,4 +1,4 @@
-import { DEFAULT_EVENT, KEY_PATTERN, MISSIONS, TEAM_CODES, TEAM_IDS, cleanEventPatch, cleanFieldValue, defaultReveal, deriveReveal, roomOfTeam, stampsOf } from './logic.ts'
+import { DEFAULT_EVENT, KEY_PATTERN, MISSIONS, TEAM_CODES, TEAM_IDS, cleanEventPatch, cleanFieldValue, defaultReveal, deriveReveal, roomOfTeam, roundIsOver, stampsOf } from './logic.ts'
 import type { Repo } from './repo.ts'
 
 export type Req = { headers: Record<string, string | undefined>; body: any; ip: string }
@@ -112,6 +112,7 @@ export function createHandler(repo: Repo, env: Env, clock: () => number = Date.n
         if (!gm && !(sess.role === 'player' && sess.team_id === op.team) && !(await facilitatorMay(op.team, op.mission))) {
           throw new HttpError(403, sess.role === 'facilitator' ? 'You can only change the room your team is in right now.' : 'You can only change your own team.')
         }
+        if (sess.role === 'player' && roundIsOver(await repo.getEvent(), clock())) throw new HttpError(403, 'Time is up for this round. Wait for the Game Master.')
         if (!TEAM_IDS.includes(op.team) || !MISSIONS.includes(op.mission)) throw bad('Unknown team or room.')
         if (typeof op.key !== 'string' || !KEY_PATTERN.test(op.key)) throw bad('Bad field name.')
         const v = cleanFieldValue(op.value)
