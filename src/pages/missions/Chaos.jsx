@@ -17,7 +17,23 @@ const OBJECTS = [
   { id: 'pizza', e: '🍕', n: 'Pizza' },
   { id: 'candle', e: '🕯️', n: 'Candle' },
   { id: 'kite', e: '🪁', n: 'Kite' },
-]
+  { id: 'trophy', e: '🏆', n: 'Trophy' },
+  { id: 'rocket', e: '🚀', n: 'Rocket' }, 
+  { id: 'pencil', e: '✏️', n: 'Pencil' },
+  { id: 'book', e: '📖', n: 'Book' },
+  { id: 'phone', e: '📱', n: 'Phone' },
+  { id: 'hat', e: '🎩', n: 'Hat' },
+  { id: 'glasses', e: '👓', n: 'Glasses' },
+  { id: 'watch', e: '⌚', n: 'Watch' },
+  { id: 'camera', e: '📷', n: 'Camera' },
+  { id: 'headphones', e: '🎧', n: 'Headphones' },
+  { id: 'laptop', e: '💻', n: 'Laptop' },
+  { id: 'umbrella', e: '☂️', n: 'Umbrella' },
+  { id: 'flashlight', e: '🔦', n: 'Flashlight' },
+  { id: 'key', e: '🔑', n: 'Key' },
+  { id: 'lock', e: '🔒', n: 'Lock' },
+  { id: 'map', e: '🗺️', n: 'Map' },
+  ]
 
 const SECTIONS = [
   { key: 'name', label: 'What is the product called?', ph: 'The Reflecto-Onion 3000', rows: 1 },
