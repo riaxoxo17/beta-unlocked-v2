@@ -1,3 +1,5 @@
+import { TwistPanel } from '../components/Twists.jsx'
+import { DEFAULT_TARGET } from '../lib/ignition.js'
 import { RoomIcon } from '../components/art.jsx'
 import { useEffect, useRef, useState } from 'react'
 import { useGame } from '../lib/useGame.jsx'
@@ -118,6 +120,7 @@ function Dashboard({ code }) {
           <div style={{ display: 'flex', gap: 22, flexWrap: 'wrap', marginTop: 16, alignItems: 'center' }}>
             <label><input type="checkbox" checked={ev.auto} onChange={(e) => patch({ auto: e.target.checked })} /> Auto-advance rounds and moves (this tab must stay open)</label>
             <label>Round <input type="number" min="1" max="15" className="input" style={{ width: 70, display: 'inline-block' }} value={Math.round(ev.roundSeconds / 60)} onChange={(e) => patch({ roundSeconds: Math.max(1, +e.target.value) * 60 })} /> min</label>
+            <label>Target per Beta ₹ <input type="number" min="10000" step="10000" className="input" style={{ width: 130, display: 'inline-block' }} value={ev.betaTarget || 1000000} onChange={(e) => patch({ betaTarget: Math.max(10000, +e.target.value || 1000000) })} /></label>
             <label>Move <input type="number" min="10" max="300" className="input" style={{ width: 80, display: 'inline-block' }} value={ev.transitionSeconds} onChange={(e) => patch({ transitionSeconds: Math.max(10, +e.target.value) })} /> sec</label>
           </div>
           <p className="hint" style={{ marginBottom: 0 }}>Timer changes apply from the next step.</p>
@@ -266,6 +269,14 @@ function TeamCard({ team, code }) {
           </div>
         ))}
       </div>
+      {roomNow === 'ignition' && (
+        <details style={{ marginBottom: 12 }}>
+          <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Throw a twist</summary>
+          <div style={{ marginTop: 8 }}>
+            <TwistPanel p={progress.ignition} target={ev.betaTarget || DEFAULT_TARGET} put={(key, value) => dispatch({ type: 'teamField', team: team.id, mission: 'ignition', key, value }, code)} />
+          </div>
+        </details>
+      )}
       <div className="label">Stamps (click to award or take back)</div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
         {ROOM_ORDER.map((r) => (

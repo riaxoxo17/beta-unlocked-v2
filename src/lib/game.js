@@ -1,3 +1,4 @@
+import { leverTotal, rupees } from './ignition.js'
 import { TEAMS, ROOM_ORDER, ROLES, STEPS } from './config.js'
 
 export const toMs = (v) => (typeof v === 'number' ? v : Date.parse(v) || 0)
@@ -62,8 +63,7 @@ export function missionSummary(mission, p = {}) {
     return p.stamp ? 'Quest complete' : `Matches ${c1} done, Dares ${c2} done, Choices ${c3}/3`
   }
   if (mission === 'ignition') {
-    const fields = ['name', 'purpose', 'act1', 'act2', 'act3', 'tagline', 'pitch'].filter((k) => (p[k] || '').trim()).length
-    return p.submitted ? 'Campaign submitted' : `${fields}/7 campaign fields`
+    return p.submitted ? `Foundation locked, plan ${rupees(leverTotal(p))}` : `Plan so far ${rupees(leverTotal(p))}`
   }
   return ''
 }

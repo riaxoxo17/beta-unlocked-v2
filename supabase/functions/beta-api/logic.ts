@@ -31,6 +31,7 @@ export const DEFAULT_EVENT = {
   stepStartedAt: null,
   endsAt: null,
   pausedAt: null,
+  betaTarget: 1000000,
   roundSeconds: 420,
   transitionSeconds: 60,
   hqSeconds: 300,
@@ -105,6 +106,10 @@ export function cleanEventPatch(patch: any, current: any): { ok: true; value: Re
       case 'transitionSeconds':
       case 'hqSeconds':
         if (!isInt(v, 5, 3600)) return { ok: false, error: `Bad ${k}.` }
+        out[k] = v
+        break
+      case 'betaTarget':
+        if (!isInt(v, 10000, 1000000000)) return { ok: false, error: `Bad ${k}.` }
         out[k] = v
         break
       case 'auto':

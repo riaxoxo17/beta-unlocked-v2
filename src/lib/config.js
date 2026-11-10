@@ -11,7 +11,7 @@ export const ROOMS = {
   chaos: { id: 'chaos', title: 'The Chaos Lab', short: 'Chaos Lab', icon: '⚡', tag: 'Creativity, imagination, teamwork', mission: 'The Impossible Invention', stamp: 'Chaos Stamp' },
   brain: { id: 'brain', title: 'The Brain Factory', short: 'Brain Factory', icon: '🧠', tag: 'Logic, observation, decoding', mission: 'The Case of the Missing Identity', stamp: 'Brain Factory Stamp' },
   fearless: { id: 'fearless', title: 'The Fearless Arena', short: 'Fearless Arena', icon: '🏆', tag: 'Interaction, courage, trust', mission: 'The Human Connection Quest', stamp: 'Fearless Stamp' },
-  ignition: { id: 'ignition', title: 'The Ignition Room', short: 'Ignition Room', icon: '🔥', tag: 'Creation, collaboration, identity', mission: 'Build Something That Matters', stamp: 'Ignition Stamp' },
+  ignition: { id: 'ignition', title: 'The Ignition Room', short: 'Ignition Room', icon: '🔥', tag: 'Planning, collaboration, funding', mission: 'Lay the Foundation', stamp: 'Ignition Stamp' },
 }
 
 export const ROLES = [
