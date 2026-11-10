@@ -2,30 +2,26 @@
 export const DEFAULT_TARGET = 1000000
 
 export const rupees = (n) => '₹' + Math.round(Number(n) || 0).toLocaleString('en-IN')
+export const toAmount = (v) => Number(String(v ?? '').replace(/\D/g, '')) || 0
 
-export const LEVERS = [
-  { id: 'volunteers', title: 'Volunteer network', hint: 'Your own volunteers and the people closest to them' },
-  { id: 'families', title: 'Parents and families', hint: 'Families of students and volunteers' },
-  { id: 'alumni', title: 'Alumni and past leaders', hint: 'People who have been part of U&I before' },
-  { id: 'corporates', title: 'Corporates and CSR', hint: 'Workplaces, employers and matching gifts' },
-  { id: 'events', title: 'Events and community drives', hint: 'Anything you host, run or join in person' },
-  { id: 'social', title: 'Social media and stories', hint: 'Public asks, posts and shared stories' },
-]
+// Initiatives are added by the team, so each one gets its own id and its own keys: ini:<id>:t (title), :owner, :amt.
+export const newInitiativeId = () => String(Date.now()) + String(Math.floor(Math.random() * 90) + 10)
+export const initiatives = (p) =>
+  Object.keys(p)
+    .map((k) => (k.match(/^ini:(\d+):t$/) || [])[1])
+    .filter(Boolean)
+    .sort()
+    .map((id) => ({ id, title: p[`ini:${id}:t`] || '', owner: p[`ini:${id}:owner`] || '', amt: toAmount(p[`ini:${id}:amt`]) }))
 
-// Twists the facilitator can throw at any moment. pct is the change to the plan as a share of the target.
+export const planTotal = (p) => initiatives(p).reduce((sum, i) => sum + i.amt, 0)
+
+// How a team splits its focus between its own centres' targets and the Beta target. Stored as the centre share.
+export const RATIOS = [70, 60, 50, 40, 30]
+
+// Moments the facilitator can bring in at any time. They are conversations, not sums.
 export const TWISTS = [
-  { id: 'donor', title: 'A big donor pulls out', text: 'Your largest committed donor has just cancelled. Rework the plan so you are still on track.', pct: -10, ask: 'Which lever do you grow to cover it, and how?' },
-  { id: 'match', title: 'A match offer appears', text: 'A well-wishing family will match the first ₹50,000 you raise, if you reach out to them in the first week.', pct: 5, ask: 'What will you do on day one to claim it?' },
-  { id: 'quiet', title: 'Your volunteers go quiet', text: 'Exams and festivals mean half your volunteer network is unreachable for a week.', pct: -8, ask: 'How do you keep momentum while they are away?' },
-  { id: 'rival', title: 'Another campaign launches the same week', text: 'A similar cause is asking the same people for money. Your tagline now sounds like everyone else.', pct: 0, ask: 'Rewrite your tagline so that nobody mixes you up.' },
-  { id: 'news', title: 'A reporter calls', text: 'A local journalist wants a one minute story about your campaign by tomorrow.', pct: 0, ask: 'Which one student story do you tell, and who tells it?' },
-  { id: 'budget', title: 'Your event budget is cut to zero', text: 'There is no money for venues, printing or food. Whatever you plan has to run for free.', pct: -5, ask: 'Which activity survives, and what do you change?' },
+  { id: 'critic', title: 'A volunteer is turning people against the campaign', text: 'One volunteer is openly negative about the campaign and it is starting to spread among others.', ask: 'How do you respond, and who in your Beta takes it on?' },
+  { id: 'stuck', title: 'One of your centres decides to do nothing', text: 'A centre in your Beta has decided not to take part in the campaign at all. It is one of yours.', ask: 'How will you show up for each other?' },
+  { id: 'double', title: 'One centre doubled its target', text: 'Your Beta has hit its target, but only because one centre doubled theirs. The others are well short.', ask: 'Do you push the other centres to hit their targets, or let it be since the Beta target is met? Why?' },
+  { id: 'ratio', title: 'Where does your focus go?', text: 'You cannot give everything to everything. Decide how your attention splits between your own centre targets and the Beta target.', ask: 'Why that split, and what would make you change it?', ratio: true },
 ]
-
-const num = (v) => Number(String(v ?? '').replace(/\D/g, '')) || 0
-
-export const leverTotal = (p) => LEVERS.reduce((sum, l) => sum + num(p['lev:' + l.id + ':amt']), 0)
-export const thrownTwists = (p) => TWISTS.filter((t) => p['tw:' + t.id])
-export const twistAdjust = (p, target) => thrownTwists(p).reduce((sum, t) => sum + Math.round((target * t.pct) / 100), 0)
-export const planTotal = (p, target) => leverTotal(p) + twistAdjust(p, target)
-export const toAmount = num

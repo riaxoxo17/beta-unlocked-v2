@@ -271,9 +271,9 @@ function TeamCard({ team, code }) {
       </div>
       {roomNow === 'ignition' && (
         <details style={{ marginBottom: 12 }}>
-          <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Throw a twist</summary>
+          <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Bring in a moment</summary>
           <div style={{ marginTop: 8 }}>
-            <TwistPanel p={progress.ignition} target={ev.betaTarget || DEFAULT_TARGET} put={(key, value) => dispatch({ type: 'teamField', team: team.id, mission: 'ignition', key, value }, code)} />
+            <TwistPanel p={progress.ignition} put={(key, value) => dispatch({ type: 'teamField', team: team.id, mission: 'ignition', key, value }, code)} />
           </div>
         </details>
       )}

@@ -6,7 +6,6 @@ import { missionSummary, roleFor, roomFor, stampsOf, teamPlayers } from '../lib/
 import { store } from '../lib/store/index.js'
 import { Btn, ConfirmBtn, Panel, TeamChip, Timer } from '../components/ui.jsx'
 import { TwistPanel } from '../components/Twists.jsx'
-import { DEFAULT_TARGET } from '../lib/ignition.js'
 
 export default function Facilitator() {
   const g = useGame()
@@ -197,8 +196,8 @@ function FacilitatorDashboard({ session, onLogout, game }) {
               </div>
               {room === 'ignition' && (
                 <div style={{ marginBottom: 14 }}>
-                  <div className="label">Throw a twist at your team (any time, any order)</div>
-                  <TwistPanel p={progress.ignition} target={ev.betaTarget || DEFAULT_TARGET} put={(key, value) => dispatch({ type: 'teamField', team: session.team, mission: 'ignition', key, value })} />
+                  <div className="label">Bring a moment to your team (any time, any order)</div>
+                  <TwistPanel p={progress.ignition} put={(key, value) => dispatch({ type: 'teamField', team: session.team, mission: 'ignition', key, value })} />
                 </div>
               )}
               <form
