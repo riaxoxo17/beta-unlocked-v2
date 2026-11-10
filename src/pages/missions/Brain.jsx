@@ -334,7 +334,7 @@ function Station1({ p, set, now, done, onPass }) {
         Study the desk for 20 seconds. Once it goes dark, answer all seven questions from memory. You can look {MAX_VIEWS} times, and your whole team sees
         the same view at the same time.
       </p>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, margin: '12px 0' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(92px, 1fr))', gap: 8, margin: '12px 0' }}>
         {SCENE.map((s) => (
           <div key={s.id} className="scene-item">
             <div>
@@ -345,7 +345,7 @@ function Station1({ p, set, now, done, onPass }) {
         ))}
       </div>
       <div style={{ height: 6, background: 'rgba(255,255,255,.08)', borderRadius: 4, marginBottom: 12 }}>
-        <div style={{ height: '100%', width: visible ? `${100 - ((now - shownAt) / WINDOW_MS) * 100}%` : 0, background: 'var(--accent)', borderRadius: 4 }} />
+        <div style={{ height: '100%', width: visible ? `${Math.max(0, Math.min(100, 100 - ((now - shownAt) / WINDOW_MS) * 100))}%` : 0, background: 'var(--accent)', borderRadius: 4 }} />
       </div>
       {!done && (
         <Btn variant="ghost" onClick={start} disabled={visible || views >= MAX_VIEWS}>
@@ -371,8 +371,8 @@ function Station1({ p, set, now, done, onPass }) {
       </div>
       {!done && (
         <div style={{ marginTop: 14 }}>
-          <Btn onClick={submit}>Check all five</Btn>
-          {result !== null && result < 5 && <span style={{ marginLeft: 12 }}>{result} of 5 correct. Discuss and adjust.</span>}
+          <Btn onClick={submit}>Check my answers</Btn>
+          {result !== null && result < QUESTIONS.length && <span style={{ marginLeft: 12 }}>{result} of {QUESTIONS.length} correct. Discuss and adjust.</span>}
         </div>
       )}
       {done && <Reward n={1} />}
@@ -430,7 +430,7 @@ function Station2({ done, onPass, onFail, wrong }) {
           ['CLEO', 'LOCKER 7'],
           ['DEV', 'LOCKER 9']
         ].map(([name, locker]) => (
-          <div key={name} className="scene-item" style={{ padding: 16 }}>
+          <div key={name} className="info-card info-card-center" style={{ padding: 16 }}>
             <div style={{ fontSize: 11, opacity: 0.6 }}>{locker}</div>
             <strong style={{ fontSize: 18 }}>{name}</strong>
           </div>
@@ -446,7 +446,7 @@ function Station2({ done, onPass, onFail, wrong }) {
           ['CLEO', 'Bruno did NOT steal the master key.'],
           ['DEV', 'Cleo did NOT steal the master key.']
         ].map(([name, statement]) => (
-          <div key={name} className="scene-item" style={{ padding: 14 }}>
+          <div key={name} className="info-card" style={{ padding: 14 }}>
             <strong style={{ color: 'var(--accent)' }}>{name}</strong>
             <p style={{ margin: '6px 0 0' }}>"{statement}"</p>
           </div>
@@ -474,8 +474,7 @@ function Station2({ done, onPass, onFail, wrong }) {
           ['03', "Number of letters in the thief's name"],
           ['04', 'Difference between the highest and lowest locker numbers']
         ].map(([n, clue]) => (
-          <div key={n} className="scene-item"
-            style={{ display: 'flex', gap: 12, alignItems: 'center', padding: 12 }}>
+          <div key={n} className="info-card" style={{ display: 'flex', gap: 12, alignItems: 'center', padding: 12 }}>
             <strong style={{ color: 'var(--accent)', fontSize: 18 }}>{n}</strong>
             <span>{clue}</span>
           </div>
@@ -621,8 +620,8 @@ function Station4({ done, onPass, onFail }) {
           ['🟢', 'GREEN', '4'],
           ['🟡', 'YELLOW', '2']
         ].map(([symbol, name, digit]) => (
-          <div key={name} className="scene-item"
-            style={{ padding: 10, textAlign: 'center' }}>
+          <div key={name} className="info-card info-card-center"
+            style={{ padding: 10 }}>
             <div style={{ fontSize: 26 }}>{symbol}</div>
             <strong style={{ fontSize: 11 }}>{name}</strong>
             <div style={{ fontSize: 18, color: 'var(--accent)' }}>
@@ -641,8 +640,7 @@ function Station4({ done, onPass, onFail }) {
           'The yellow symbol appears somewhere after the blue symbol.',
           'The green symbol appears before the yellow symbol.'
         ].map((clue, i) => (
-          <div key={i} className="scene-item"
-            style={{ display: 'flex', gap: 12, padding: 12 }}>
+          <div key={i} className="info-card" style={{ display: 'flex', gap: 12, padding: 12 }}>
             <strong style={{ color: 'var(--accent)' }}>
               {String(i + 1).padStart(2, '0')}
             </strong>
@@ -755,7 +753,7 @@ function Station5({ p, set, done, onPass, onFail }) {
         <br />
         &gt; SOLVE BOTH TO PROCEED
         <br />
-        &gt; MULTIPLY YOUR ANSWERS
+        &gt; ENTER BOTH ANSWERS
       </div>
 
       <div className="terminal" style={{ marginTop: 14 }}>
@@ -777,7 +775,7 @@ function Station5({ p, set, done, onPass, onFail }) {
       </div>
 
       <p className="hint" style={{ marginTop: 14 }}>
-        Final instruction: Multiply your two answers and enter the result.
+        Final instruction: enter the missing number from each sequence.
       </p>
 
       <form onSubmit={submit} style={{ display: 'grid', gap: 10 }}>

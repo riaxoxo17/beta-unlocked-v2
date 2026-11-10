@@ -21,13 +21,22 @@ export const HASHES = {
   "b3.book": [
     "1zgr0h66gvo"
   ],
-  "b4.code": [
-    "1g184t9by6z"
-  ],
-  "b5.seq": [
-    "av4sk6482g"
-  ],
   "b6.final": [
     "1b7hks6tqc7"
+  ],
+  "b1.compass-direction": [
+    "dfab6r2ezz"
+  ],
+  "b1.tower": [
+    "rdg9075uug"
+  ],
+  "b1.magnifier": [
+    "21feos62v7q"
+  ],
+  "b1.balloon": [
+    "155kp7jcm0n"
+  ],
+  "b1.globe": [
+    "v1vlj6qcb7"
   ]
 }

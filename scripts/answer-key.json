@@ -6,7 +6,10 @@
   "b1.next": ["plant"],
   "b2.locker": ["7"],
   "b3.book": ["missing-piece"],
-  "b4.code": ["lock"],
-  "b5.seq": ["64"],
-  "b6.final": ["42854"]
+  "b6.final": ["42854"],
+  "b1.compass-direction": ["N"],
+  "b1.tower": ["spike"],
+  "b1.magnifier": ["fingerprint"],
+  "b1.balloon": ["red"],
+  "b1.globe": ["green"]
 }

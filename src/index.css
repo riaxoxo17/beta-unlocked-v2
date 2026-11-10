@@ -376,9 +376,41 @@ textarea.input {
   text-align: center;
 }
 .scene-item small {
-  font-size: 12px;
+  font-size: 11px;
+  line-height: 1.15;
   color: var(--muted);
   display: block;
+  padding: 0 4px;
+  overflow-wrap: anywhere;
+}
+.scene-item > div {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  width: 100%;
+}
+.scene-item svg {
+  width: 44px;
+  height: 44px;
+  display: block;
+}
+/* Text cards for case files, clues and symbol keys. Unlike .scene-item these are not square. */
+.info-card {
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.35);
+  text-align: left;
+  font-size: 15px;
+  line-height: 1.45;
+}
+.info-card-center {
+  text-align: center;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
+.info-card p {
+  font-size: 15px;
 }
 .locker {
   width: 100%;
