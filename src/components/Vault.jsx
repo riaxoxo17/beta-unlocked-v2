@@ -184,7 +184,7 @@ export function FinalReveal() {
           <Confetti color="#a855f7" />
           <div>
             <motion.h1 initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="pixel" style={{ fontSize: 'clamp(28px, 6vw, 64px)', marginBottom: 24 }}>
-              Meet the four Betas
+              Meet the four Bettas
             </motion.h1>
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 'clamp(14px, 3vw, 40px)' }}>
               {TEAMS.map((t, i) => (

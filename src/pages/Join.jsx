@@ -47,7 +47,7 @@ export default function Join() {
             <DoorArt key={t.id} color={t.color} number={t.door} open={teamId === t.id} width={64} />
           ))}
         </div>
-        <h1 className="pixel join-title">Beta: Unlocked</h1>
+        <h1 className="pixel join-title">Betta: Unlocked</h1>
         <p className="join-sub">Four doors. One of them is yours.</p>
       </div>
 

@@ -120,7 +120,7 @@ function Dashboard({ code }) {
           <div style={{ display: 'flex', gap: 22, flexWrap: 'wrap', marginTop: 16, alignItems: 'center' }}>
             <label><input type="checkbox" checked={ev.auto} onChange={(e) => patch({ auto: e.target.checked })} /> Auto-advance rounds and moves (this tab must stay open)</label>
             <label>Round <input type="number" min="1" max="15" className="input" style={{ width: 70, display: 'inline-block' }} value={Math.round(ev.roundSeconds / 60)} onChange={(e) => patch({ roundSeconds: Math.max(1, +e.target.value) * 60 })} /> min</label>
-            <label>Target per Beta ₹ <input type="number" min="10000" step="10000" className="input" style={{ width: 130, display: 'inline-block' }} value={ev.betaTarget || 1000000} onChange={(e) => patch({ betaTarget: Math.max(10000, +e.target.value || 1000000) })} /></label>
+            <label>Target per Betta ₹ <input type="number" min="10000" step="10000" className="input" style={{ width: 130, display: 'inline-block' }} value={ev.betaTarget || 1000000} onChange={(e) => patch({ betaTarget: Math.max(10000, +e.target.value || 1000000) })} /></label>
             <label>Move <input type="number" min="10" max="300" className="input" style={{ width: 80, display: 'inline-block' }} value={ev.transitionSeconds} onChange={(e) => patch({ transitionSeconds: Math.max(10, +e.target.value) })} /> sec</label>
           </div>
           <p className="hint" style={{ marginBottom: 0 }}>Timer changes apply from the next step.</p>

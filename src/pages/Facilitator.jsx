@@ -97,7 +97,7 @@ function FacilitatorDashboard({ session, onLogout, game }) {
       <header className="hud">
         <div className="wrap" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: '12px 0', flexWrap: 'wrap' }}>
           <div>
-            <div className="hint">Beta: Unlocked, team facilitator</div>
+            <div className="hint">Betta: Unlocked, team facilitator</div>
             <h1 style={{ margin: '3px 0', fontSize: 24 }}>Welcome, {session.name || 'Facilitator'}</h1>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>

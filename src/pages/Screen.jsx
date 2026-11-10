@@ -15,7 +15,7 @@ export default function Screen() {
     <div className="stage" data-room="hq" style={{ padding: '24px 4vw 40px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <h1 className="pixel" style={{ fontSize: 'clamp(28px, 4vw, 52px)', fontWeight: 700 }}>
-          Beta: Unlocked
+          Betta: Unlocked
         </h1>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 20 }}>
           <span style={{ fontSize: 'clamp(18px, 2.4vw, 30px)' }} className="muted">

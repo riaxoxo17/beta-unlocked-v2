@@ -17,7 +17,7 @@ export default function Passport() {
       <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
         <div>
           <div className="pixel" style={{ fontSize: 22, fontWeight: 700 }}>
-            Beta: Unlocked
+            Betta: Unlocked
           </div>
           <div className="hint">Player passport. Identity sealed until the vault.</div>
         </div>
@@ -42,7 +42,7 @@ export default function Passport() {
           {revealed && payload?.name ? payload.name : '???'}
         </div>
         <div className="hint">
-          {revealed ? payload?.tagline : stamps.length === 4 ? 'All four stamps collected. Head to the vault.' : `${stamps.length} of 4 stamps. Collect them all to discover your Beta.`}
+          {revealed ? payload?.tagline : stamps.length === 4 ? 'All four stamps collected. Head to the vault.' : `${stamps.length} of 4 stamps. Collect them all to discover your Betta.`}
         </div>
       </div>
     </div>

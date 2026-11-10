@@ -45,7 +45,7 @@ function Briefing() {
   return (
     <div style={{ display: 'grid', gap: 16 }}>
       <Panel>
-        <h2 style={{ marginBottom: 8 }}>Welcome to Beta headquarters</h2>
+        <h2 style={{ marginBottom: 8 }}>Welcome to Betta headquarters</h2>
         <p style={{ margin: 0 }}>
           You thought this was an introduction. It is a mission. Four teams will rotate through four rooms. Each room earns your team a stamp, and four
           stamps unlock something that already belongs to you.
