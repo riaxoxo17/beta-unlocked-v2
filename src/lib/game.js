@@ -55,10 +55,11 @@ export function missionSummary(mission, p = {}) {
     return p.final ? 'Case solved' : `${n}/5 stations solved`
   }
   if (mission === 'fearless') {
-    const c1 = ['food', 'weekend', 'habit'].filter((t) => p[`c1:${t}:who`] && p[`c1:${t}:what`]).length
+    const ids = new Set(Object.keys(p).map((k) => (k.match(/^c1:[a-z]+:who:(.+)$/) || [])[1]).filter(Boolean))
+    const c1 = [...ids].filter((id) => ['food', 'weekend', 'habit'].every((t) => p[`c1:${t}:who:${id}`] && p[`c1:${t}:what:${id}`])).length
     const c2 = Object.keys(p).filter((k) => /^c2:.+:done$/.test(k) && p[k]).length
     const c3 = [0, 1, 2].filter((i) => p[`c3:${i}:done`]).length
-    return p.stamp ? 'Quest complete' : `Matches ${c1}/3, Dares ${c2} done, Choices ${c3}/3`
+    return p.stamp ? 'Quest complete' : `Matches ${c1} done, Dares ${c2} done, Choices ${c3}/3`
   }
   if (mission === 'ignition') {
     const fields = ['name', 'purpose', 'act1', 'act2', 'act3', 'tagline', 'pitch'].filter((k) => (p[k] || '').trim()).length

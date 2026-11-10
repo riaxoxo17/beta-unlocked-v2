@@ -61,7 +61,9 @@ export default function Fearless() {
     })
   }) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const c1 = TRAITS.every((t) => (p[`c1:${t.id}:who`] || '').trim() && (p[`c1:${t.id}:what`] || '').trim())
+  // Find your match is personal: every player logs their own three matches, and the team is done when everyone has.
+  const logged = (pid) => TRAITS.every((t) => (p[`c1:${t.id}:who:${pid}`] || '').trim() && (p[`c1:${t.id}:what:${pid}`] || '').trim())
+  const c1 = players.length > 0 && players.every((pl) => logged(pl.id))
   // Dare Ring: player i dares player i+1. Done when every dare is chosen and confirmed by the one who set it.
   const ring = players.map((pl, i) => ({ giver: pl, target: players[(i + 1) % players.length] }))
   const c2 = ring.length > 0 && ring.every((r) => p[`c2:${r.giver.id}:dare`] && p[`c2:${r.giver.id}:done`])
@@ -97,17 +99,21 @@ export default function Fearless() {
       {tab === 1 && (
         <Panel>
           <p style={{ marginTop: 0 }}>
-            Find someone from <b>another team</b> and discover three things you have in common. Use Gather chat or a quick call, then log each match.
+            Find someone from <b>another team</b> and discover three things you have in common. Use Gather chat or a quick call, then log each match. <b>Everyone logs their own</b>, so each teammate meets different people.
           </p>
           {TRAITS.map((t) => (
             <div key={t.id} style={{ borderTop: '1px solid var(--line)', paddingTop: 12, marginTop: 12 }}>
               <div className="label">{t.label}</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
-                <SharedField value={p[`c1:${t.id}:who`]} onCommit={(v) => set(`c1:${t.id}:who`, v)} placeholder="Their name" />
-                <SharedField value={p[`c1:${t.id}:what`]} onCommit={(v) => set(`c1:${t.id}:what`, v)} placeholder="What you share" />
+                <SharedField value={p[`c1:${t.id}:who:${me.id}`]} onCommit={(v) => set(`c1:${t.id}:who:${me.id}`, v)} placeholder="Their name" />
+                <SharedField value={p[`c1:${t.id}:what:${me.id}`]} onCommit={(v) => set(`c1:${t.id}:what:${me.id}`, v)} placeholder="What you share" />
               </div>
             </div>
           ))}
+          <p className="hint" style={{ marginTop: 16, marginBottom: 0 }}>
+            {players.filter((pl) => logged(pl.id)).length} of {players.length} teammates have logged all three.{' '}
+            {players.filter((pl) => !logged(pl.id)).map((pl) => (pl.id === me.id ? 'You' : pl.name)).join(', ') && `Still to log: ${players.filter((pl) => !logged(pl.id)).map((pl) => (pl.id === me.id ? 'you' : pl.name)).join(', ')}.`}
+          </p>
           <details style={{ marginTop: 16 }}>
             <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Who is out there ({rosterOthers.length})</summary>
             <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>

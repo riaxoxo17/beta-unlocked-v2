@@ -615,10 +615,11 @@ function Station4({ done, onPass, onFail }) {
         gap: 8
       }}>
         {[
+          ['🟢', 'GREEN', '4'],
           ['🔴', 'RED', '3'],
           ['🔵', 'BLUE', '1'],
-          ['🟢', 'GREEN', '4'],
           ['🟡', 'YELLOW', '2']
+          
         ].map(([symbol, name, digit]) => (
           <div key={name} className="info-card info-card-center"
             style={{ padding: 10 }}>
