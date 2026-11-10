@@ -21,7 +21,7 @@ export const RATIOS = [70, 60, 50, 40, 30]
 // Moments the facilitator can bring in at any time. They are conversations, not sums.
 export const TWISTS = [
   { id: 'critic', title: 'A volunteer is turning people against the campaign', text: 'One volunteer is openly negative about the campaign and it is starting to spread among others.', ask: 'How do you respond, and who in your Beta takes it on?' },
-  { id: 'stuck', title: 'One of your centres decides to do nothing', text: 'A centre in your Beta has decided not to take part in the campaign at all. It is one of yours.', ask: 'How will you show up for each other?' },
-  { id: 'double', title: 'One centre doubled its target', text: 'Your Beta has hit its target, but only because one centre doubled theirs. The others are well short.', ask: 'Do you push the other centres to hit their targets, or let it be since the Beta target is met? Why?' },
-  { id: 'ratio', title: 'Where does your focus go?', text: 'You cannot give everything to everything. Decide how your attention splits between your own centre targets and the Beta target.', ask: 'Why that split, and what would make you change it?', ratio: true },
+  { id: 'stuck', title: 'One of your centres decides to do nothing', text: 'A centre in your Betta has decided not to take part in the campaign at all. It is one of yours.', ask: 'How will you show up for each other?' },
+  { id: 'double', title: 'One centre doubled its target', text: 'Your Betta has hit its target, but only because one centre doubled theirs. The others are well short.', ask: 'Do you push the other centres to hit their targets, or let it be since the Betta target is met? Why?' },
+  { id: 'ratio', title: 'Where does your focus go?', text: 'You cannot give everything to everything. Decide how your attention splits between your own centre targets and the Betta target.', ask: 'Why that split, and what would make you change it?', ratio: true }
 ]

@@ -52,7 +52,7 @@ export default function Ignition() {
       <Panel>
         <h3 style={{ marginBottom: 6 }}>Your Betta has to raise {rupees(target)}</h3>
         <p style={{ margin: '0 0 12px' }}>
-          Each of you leads a centre, and together you carry this target. Sit down, talk, and decide how your Beta will get there. Nobody is handing you the ideas. Add the initiatives you believe in and
+          Each of you leads a centre, and together you carry this target. Sit down, talk, and decide how your Betta will get there. Nobody is handing you the ideas. Add the initiatives you believe in and
           choose who is accountable for each, so that when the campaign opens you can simply execute.
         </p>
         <Meter total={total} target={target} />
