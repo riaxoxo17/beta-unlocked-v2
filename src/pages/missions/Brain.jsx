@@ -318,6 +318,8 @@ function Station1({ p, set, now, done, onPass }) {
   const shownAt = p.s1shownAt || 0
   const visible = now - shownAt < WINDOW_MS && shownAt > 0
   const [result, setResult] = useState(null)
+  // Questions are only on screen once the team has seen the objects, and are hidden again whenever the objects are showing.
+  const showQuestions = done || (views > 0 && !visible)
   const start = () => {
     set('s1views', views + 1)
     set('s1shownAt', store.now())
@@ -352,7 +354,9 @@ function Station1({ p, set, now, done, onPass }) {
           {views >= MAX_VIEWS ? 'No views left' : views ? `Look again (${MAX_VIEWS - views} left)` : 'Start the 20 second look'}
         </Btn>
       )}
-      <div style={{ display: 'grid', gap: 12, marginTop: 16 }}>
+      {!done && views === 0 && !visible && <p className="hint" style={{ marginTop: 16 }}>The questions appear once you have looked at the desk.</p>}
+      {!done && visible && <p className="hint" style={{ marginTop: 16 }}>The questions stay hidden while the desk is lit. Watch closely.</p>}
+      <div style={{ display: showQuestions ? 'grid' : 'none', gap: 12, marginTop: 16 }}>
         {QUESTIONS.map((q) => (
           <div key={q.id}>
             <label className="label" htmlFor={'q-' + q.id}>
@@ -369,7 +373,7 @@ function Station1({ p, set, now, done, onPass }) {
           </div>
         ))}
       </div>
-      {!done && (
+      {!done && showQuestions && (
         <div style={{ marginTop: 14 }}>
           <Btn onClick={submit}>Check my answers</Btn>
           {result !== null && result < QUESTIONS.length && <span style={{ marginLeft: 12 }}>{result} of {QUESTIONS.length} correct. Discuss and adjust.</span>}
@@ -615,10 +619,10 @@ function Station4({ done, onPass, onFail }) {
         gap: 8
       }}>
         {[
+          ['🟡', 'YELLOW', '2'],
           ['🟢', 'GREEN', '4'],
           ['🔴', 'RED', '3'],
-          ['🔵', 'BLUE', '1'],
-          ['🟡', 'YELLOW', '2']
+          ['🔵', 'BLUE', '1']
           
         ].map(([symbol, name, digit]) => (
           <div key={name} className="info-card info-card-center"
