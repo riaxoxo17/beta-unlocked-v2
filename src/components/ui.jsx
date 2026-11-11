@@ -63,8 +63,15 @@ export function Field({ label, hint, children, htmlFor }) {
   )
 }
 
-export function Timer({ endsAt, pausedAt = null, size = 22 }) {
+export function Timer({ endsAt, pausedAt = null, seconds = null, size = 22 }) {
   const now = useNow(250)
+  if (!endsAt && seconds) {
+    return (
+      <span className="clock paused" style={{ fontSize: size }} aria-label="timer ready to start">
+        Ready {fmt(seconds * 1000)}
+      </span>
+    )
+  }
   if (!endsAt) return null
   const left = endsAt - (pausedAt || now)
   const urgent = !pausedAt && left > 0 && left <= 10000

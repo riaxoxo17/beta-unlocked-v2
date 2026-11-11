@@ -16,10 +16,45 @@ export function roomOfTeam(event: any, team: string): string | null {
 
 // True once a round's timer has run out (and is not paused). Players cannot write after this, so time is a hard stop.
 export const HARD_STOP_GRACE_MS = 2000
-export function roundIsOver(event: any, now: number): boolean {
-  const step = Number(event?.step ?? 0)
-  const isRound = step >= 1 && step <= 7 && step % 2 === 1
-  return isRound && typeof event?.endsAt === 'number' && !event?.pausedAt && now > event.endsAt + HARD_STOP_GRACE_MS
+export function roundIsOver(event: any, now: number, team: string): boolean {
+  const room = roomOfTeam(event, team)
+  const t = room ? event?.roomTimers?.[room] : null
+  return !!t && typeof t.endsAt === 'number' && !t.pausedAt && now > t.endsAt + HARD_STOP_GRACE_MS
+}
+
+// Each room runs its own timer. The same rules run in the browser (src/lib/store/reducer.js), so keep them identical.
+export const TIMER_ACTIONS = ['start', 'pause', 'resume', 'extend', 'restart']
+export function applyTimerAction(timer: any, action: string, now: number, roundSeconds = 420, extra = 60) {
+  const t = { seconds: Number(timer?.seconds) || roundSeconds, startedAt: timer?.startedAt ?? null, endsAt: timer?.endsAt ?? null, pausedAt: timer?.pausedAt ?? null }
+  switch (action) {
+    case 'start':
+      if (t.endsAt === null) {
+        t.startedAt = now
+        t.endsAt = now + t.seconds * 1000
+      }
+      return t
+    case 'pause':
+      if (t.endsAt !== null && t.pausedAt === null && t.endsAt > now) t.pausedAt = now
+      return t
+    case 'resume':
+      if (t.pausedAt !== null && t.endsAt !== null) {
+        t.endsAt += now - t.pausedAt
+        t.pausedAt = null
+      }
+      return t
+    case 'extend':
+      if (t.endsAt === null) t.seconds += extra
+      else if (t.pausedAt === null && t.endsAt < now) t.endsAt = now + extra * 1000
+      else t.endsAt += extra * 1000
+      return t
+    case 'restart':
+      t.startedAt = now
+      t.endsAt = now + t.seconds * 1000
+      t.pausedAt = null
+      return t
+    default:
+      return null
+  }
 }
 
 export const STAGES = ['clue', 'countdown', 'name', 'done']
@@ -31,6 +66,8 @@ export const DEFAULT_EVENT = {
   stepStartedAt: null,
   endsAt: null,
   pausedAt: null,
+  roomTimers: {} as Record<string, unknown>,
+  manualStart: false,
   betaTarget: 1000000,
   roundSeconds: 420,
   transitionSeconds: 60,
@@ -112,6 +149,19 @@ export function cleanEventPatch(patch: any, current: any): { ok: true; value: Re
         if (!isInt(v, 10000, 1000000000)) return { ok: false, error: `Bad ${k}.` }
         out[k] = v
         break
+      case 'roomTimers': {
+        // Only the Game Master sets all four at once, when a round starts.
+        if (!v || typeof v !== 'object' || Array.isArray(v)) return { ok: false, error: 'Bad roomTimers.' }
+        const clean: Record<string, unknown> = {}
+        for (const [room, t] of Object.entries(v as Record<string, any>)) {
+          if (!MISSIONS.includes(room) || !t || typeof t !== 'object') return { ok: false, error: 'Bad roomTimers.' }
+          if (!isInt(t.seconds, 5, 7200) || !isTime(t.startedAt ?? null) || !isTime(t.endsAt ?? null) || !isTime(t.pausedAt ?? null)) return { ok: false, error: 'Bad roomTimers.' }
+          clean[room] = { seconds: t.seconds, startedAt: t.startedAt ?? null, endsAt: t.endsAt ?? null, pausedAt: t.pausedAt ?? null }
+        }
+        out[k] = clean
+        break
+      }
+      case 'manualStart':
       case 'auto':
         if (typeof v !== 'boolean') return { ok: false, error: `Bad ${k}.` }
         out[k] = v

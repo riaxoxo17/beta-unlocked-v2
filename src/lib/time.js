@@ -22,20 +22,20 @@ export function fmt(ms) {
 export const msLeft = (ev, now) => (ev?.endsAt ? ev.endsAt - (ev.pausedAt || now) : null)
 
 // True once the timer has run out and is not paused.
-export function useTimeUp(ev) {
+export function useTimeUp(timer) {
   const now = useNow(250)
-  const left = msLeft(ev, now)
-  return left !== null && left <= 0 && !ev.pausedAt
+  const left = msLeft(timer, now)
+  return left !== null && left <= 0 && !timer.pausedAt
 }
 
 // Ticks through the last ten seconds, then sounds a horn at zero. Plays on every screen that uses it.
-export function useTimerAlerts(ev) {
+export function useTimerAlerts(timer) {
   const now = useNow(250)
-  const left = msLeft(ev, now)
+  const left = msLeft(timer, now)
   const lastSec = useRef(null)
   const hornFor = useRef(null)
   useEffect(() => {
-    if (left === null || ev.pausedAt) return
+    if (left === null || timer.pausedAt) return
     if (left > 0) {
       const sec = Math.ceil(left / 1000)
       if (sec <= 10 && sec !== lastSec.current) {
@@ -43,9 +43,9 @@ export function useTimerAlerts(ev) {
         sfx.countdown(sec)
       }
       if (sec > 10) lastSec.current = null
-    } else if (hornFor.current !== ev.endsAt && -left < 4000) {
-      hornFor.current = ev.endsAt
+    } else if (hornFor.current !== timer.endsAt && -left < 4000) {
+      hornFor.current = timer.endsAt
       sfx.horn()
     }
-  }, [left, ev.endsAt, ev.pausedAt])
+  }, [left, timer.endsAt, timer.pausedAt])
 }

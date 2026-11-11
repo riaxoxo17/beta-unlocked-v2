@@ -9,6 +9,8 @@ export const defaultEvent = () => ({
   stepStartedAt: null,
   endsAt: null,
   pausedAt: null,
+  roomTimers: {},
+  manualStart: false,
   betaTarget: 1000000,
   roundSeconds: 420,
   transitionSeconds: 60,
@@ -31,12 +33,51 @@ export const initialState = () => ({
   final: false, // the finale is on
 })
 
+// Each room runs its own timer. Same rules as supabase/functions/beta-api/logic.ts, so keep them identical.
+export function applyTimerAction(timer, action, now, roundSeconds = 420, extra = 60) {
+  const t = { seconds: Number(timer?.seconds) || roundSeconds, startedAt: timer?.startedAt ?? null, endsAt: timer?.endsAt ?? null, pausedAt: timer?.pausedAt ?? null }
+  switch (action) {
+    case 'start':
+      if (t.endsAt === null) {
+        t.startedAt = now
+        t.endsAt = now + t.seconds * 1000
+      }
+      return t
+    case 'pause':
+      if (t.endsAt !== null && t.pausedAt === null && t.endsAt > now) t.pausedAt = now
+      return t
+    case 'resume':
+      if (t.pausedAt !== null && t.endsAt !== null) {
+        t.endsAt += now - t.pausedAt
+        t.pausedAt = null
+      }
+      return t
+    case 'extend':
+      if (t.endsAt === null) t.seconds += extra
+      else if (t.pausedAt === null && t.endsAt < now) t.endsAt = now + extra * 1000
+      else t.endsAt += extra * 1000
+      return t
+    case 'restart':
+      t.startedAt = now
+      t.endsAt = now + t.seconds * 1000
+      t.pausedAt = null
+      return t
+    default:
+      return null
+  }
+}
+
 export function applyOp(state, op) {
   const s = structuredClone(state)
   switch (op.type) {
     case 'event':
       Object.assign(s.event, op.patch)
       break
+    case 'roomTimer': {
+      const t = applyTimerAction(s.event.roomTimers?.[op.room], op.action, op.at ?? Date.now(), s.event.roundSeconds, op.seconds ?? 60)
+      if (t) s.event.roomTimers = { ...s.event.roomTimers, [op.room]: t }
+      break
+    }
     case 'teamField': {
       s.teams[op.team] ||= { progress: blankProgress(), hint: null }
       const prog = s.teams[op.team].progress

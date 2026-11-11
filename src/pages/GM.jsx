@@ -1,10 +1,11 @@
 import { TwistPanel } from '../components/Twists.jsx'
+import { RoomTimerControls } from '../components/RoomTimerControls.jsx'
 import { DEFAULT_TARGET } from '../lib/ignition.js'
 import { RoomIcon } from '../components/art.jsx'
 import { useEffect, useRef, useState } from 'react'
 import { useGame } from '../lib/useGame.jsx'
 import { ROOMS, ROOM_ORDER, STEPS, TEAMS, COUNTDOWN_SECONDS } from '../lib/config.js'
-import { missionSummary, roleFor, roomFor, stampsOf, stepDuration, teamPlayers } from '../lib/game.js'
+import { missionSummary, roleFor, roomFor, stampsOf, stepDuration, teamPlayers, timerFor } from '../lib/game.js'
 import { store } from '../lib/store/index.js'
 import { Btn, ConfirmBtn, Panel, Timer } from '../components/ui.jsx'
 
@@ -68,7 +69,13 @@ function Dashboard({ code }) {
     const i = Math.max(0, Math.min(last, n))
     const dur = stepDuration(i, ev)
     const now = store.now()
-    dispatch({ type: 'event', patch: { step: i, stepStartedAt: now, endsAt: dur ? now + dur * 1000 : null, pausedAt: null } }, code)
+    if (STEPS[i].phase === 'round') {
+      // Every room gets its own timer. With "rooms wait for their facilitator" on, they start as ready and the facilitator presses Start.
+      const fresh = { seconds: dur, startedAt: ev.manualStart ? null : now, endsAt: ev.manualStart ? null : now + dur * 1000, pausedAt: null }
+      dispatch({ type: 'event', patch: { step: i, stepStartedAt: now, endsAt: null, pausedAt: null, roomTimers: Object.fromEntries(ROOM_ORDER.map((r) => [r, fresh])) } }, code)
+    } else {
+      dispatch({ type: 'event', patch: { step: i, stepStartedAt: now, endsAt: dur ? now + dur * 1000 : null, pausedAt: null, roomTimers: {} } }, code)
+    }
   }
 
   // Optional auto-advance, only while this dashboard stays open.
@@ -78,7 +85,10 @@ function Dashboard({ code }) {
     const id = setInterval(() => {
       const { ev: e, goStep: go } = stateRef.current
       const ph = STEPS[e.step].phase
-      if (e.auto && e.endsAt && !e.pausedAt && store.now() > e.endsAt && (ph === 'round' || ph === 'transition')) go(e.step + 1)
+      const n = store.now()
+      const over = (t) => t && t.endsAt && !t.pausedAt && n > t.endsAt
+      if (e.auto && ph === 'round' && ROOM_ORDER.every((r) => over(e.roomTimers?.[r]))) go(e.step + 1)
+      if (e.auto && ph === 'transition' && over({ endsAt: e.endsAt, pausedAt: e.pausedAt })) go(e.step + 1)
     }, 1000)
     return () => clearInterval(id)
   }, [])
@@ -107,23 +117,51 @@ function Dashboard({ code }) {
               <div className="hint">Now ({ev.step + 1}/{STEPS.length})</div>
               <h2>{stepInfo.label}</h2>
             </div>
-            <Timer endsAt={ev.endsAt} pausedAt={ev.pausedAt} size={44} />
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <Btn variant="ghost" disabled={ev.step === 0} onClick={() => goStep(ev.step - 1)}>Back</Btn>
-              <Btn variant="ghost" disabled={!ev.endsAt} onClick={() => (ev.pausedAt ? patch({ endsAt: ev.endsAt + (store.now() - ev.pausedAt), pausedAt: null }) : patch({ pausedAt: store.now() }))}>
-                {ev.pausedAt ? 'Resume timer' : 'Pause timer'}
-              </Btn>
-              <Btn variant="ghost" disabled={!ev.endsAt} onClick={() => patch({ endsAt: ev.endsAt + 60000 })}>+1 min</Btn>
               <Btn disabled={ev.step === last} onClick={() => goStep(ev.step + 1)}>Next: {nextLabel}</Btn>
             </div>
           </div>
+
+          {stepInfo.phase === 'round' ? (
+            <div style={{ marginTop: 16 }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
+                <b>Room timers</b>
+                <span className="hint">Each facilitator can run their own room. You can run any of them.</span>
+                <Btn small variant="ghost" onClick={() => ROOM_ORDER.forEach((r) => dispatch({ type: 'roomTimer', room: r, action: 'start', at: store.now() }, code))}>Start all</Btn>
+                <Btn small variant="ghost" onClick={() => ROOM_ORDER.forEach((r) => dispatch({ type: 'roomTimer', room: r, action: 'pause', at: store.now() }, code))}>Pause all</Btn>
+                <Btn small variant="ghost" onClick={() => ROOM_ORDER.forEach((r) => dispatch({ type: 'roomTimer', room: r, action: 'resume', at: store.now() }, code))}>Resume all</Btn>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 12 }}>
+                {ROOM_ORDER.map((r) => {
+                  const here = TEAMS.find((t) => roomFor(t.id, stepInfo.round) === r)
+                  return (
+                    <div key={r} style={{ border: '1px solid var(--line)', borderRadius: 12, padding: 12, borderColor: here?.color }}>
+                      <b><RoomIcon room={r} size={16} /> {ROOMS[r].short}</b>
+                      <div className="hint" style={{ marginBottom: 8 }}>{here ? `${here.name} is here` : 'Empty'}</div>
+                      <RoomTimerControls room={r} timer={timerFor(ev, 'round', r)} dispatch={(op) => dispatch(op, code)} size={30} />
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginTop: 14 }}>
+              <Timer endsAt={ev.endsAt} pausedAt={ev.pausedAt} size={44} />
+              <Btn small variant="ghost" disabled={!ev.endsAt} onClick={() => (ev.pausedAt ? patch({ endsAt: ev.endsAt + (store.now() - ev.pausedAt), pausedAt: null }) : patch({ pausedAt: store.now() }))}>
+                {ev.pausedAt ? 'Resume timer' : 'Pause timer'}
+              </Btn>
+              <Btn small variant="ghost" disabled={!ev.endsAt} onClick={() => patch({ endsAt: ev.endsAt + 60000 })}>+1 min</Btn>
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 22, flexWrap: 'wrap', marginTop: 16, alignItems: 'center' }}>
-            <label><input type="checkbox" checked={ev.auto} onChange={(e) => patch({ auto: e.target.checked })} /> Auto-advance rounds and moves (this tab must stay open)</label>
+            <label><input type="checkbox" checked={!!ev.manualStart} onChange={(e) => patch({ manualStart: e.target.checked })} /> Rooms wait for their facilitator to press Start</label>
+            <label><input type="checkbox" checked={ev.auto} onChange={(e) => patch({ auto: e.target.checked })} /> Auto-advance when every room has finished, and after moves (this tab must stay open)</label>
             <label>Round <input type="number" min="1" max="15" className="input" style={{ width: 70, display: 'inline-block' }} value={Math.round(ev.roundSeconds / 60)} onChange={(e) => patch({ roundSeconds: Math.max(1, +e.target.value) * 60 })} /> min</label>
             <label>Target per Betta ₹ <input type="number" min="10000" step="10000" className="input" style={{ width: 130, display: 'inline-block' }} value={ev.betaTarget || 1000000} onChange={(e) => patch({ betaTarget: Math.max(10000, +e.target.value || 1000000) })} /></label>
             <label>Move <input type="number" min="10" max="300" className="input" style={{ width: 80, display: 'inline-block' }} value={ev.transitionSeconds} onChange={(e) => patch({ transitionSeconds: Math.max(10, +e.target.value) })} /> sec</label>
           </div>
-          <p className="hint" style={{ marginBottom: 0 }}>Timer changes apply from the next step.</p>
+          <p className="hint" style={{ marginBottom: 0 }}>Round length and the start setting apply from the next round.</p>
         </Panel>
 
         <div className="tabs" role="tablist" style={{ borderBottom: '1px solid var(--line)' }}>

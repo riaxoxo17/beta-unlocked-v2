@@ -153,6 +153,19 @@ begin
   return 'true'::jsonb;
 end $$;
 
+-- Set one room's timer without touching the other rooms, so facilitators in different rooms never overwrite each other.
+create or replace function api_set_room_timer(p jsonb)
+returns jsonb language plpgsql as $$
+begin
+  update event_state
+     set state = jsonb_set(
+           jsonb_set(state, '{roomTimers}', coalesce(state -> 'roomTimers', '{}'::jsonb), true),
+           array['roomTimers', p ->> 'room'], coalesce(p -> 'timer', 'null'::jsonb), true),
+         updated_at = now()
+   where id = 1;
+  return 'true'::jsonb;
+end $$;
+
 create or replace function api_get_teams(p jsonb default '{}')
 returns jsonb language sql stable as $$
   select coalesce(jsonb_agg(jsonb_build_object('id', id, 'progress', progress, 'hint', hint) order by id), '[]'::jsonb)

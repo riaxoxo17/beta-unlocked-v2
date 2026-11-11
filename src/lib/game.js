@@ -25,6 +25,15 @@ export function stepDuration(stepIndex, ev) {
   return 0
 }
 
+// The timer a viewer should see: the room's own timer during a round, the shared one for moves and headquarters.
+export function timerFor(ev, phase, room) {
+  if (phase === 'round') {
+    const t = room ? ev.roomTimers?.[room] : null
+    return { endsAt: t?.endsAt ?? null, pausedAt: t?.pausedAt ?? null, seconds: t ? t.seconds : null }
+  }
+  return { endsAt: ev.endsAt ?? null, pausedAt: ev.pausedAt ?? null, seconds: null }
+}
+
 export function teamPlayers(state, teamId) {
   return Object.values(state.players)
     .filter((p) => p.team === teamId)

@@ -11,7 +11,7 @@ import Chaos from './missions/Chaos.jsx'
 import Brain from './missions/Brain.jsx'
 import Fearless from './missions/Fearless.jsx'
 import Ignition from './missions/Ignition.jsx'
-import { roleFor } from '../lib/game.js'
+import { roleFor, timerFor } from '../lib/game.js'
 import { useTimerAlerts, useTimeUp } from '../lib/time.js'
 
 const MISSIONS = { chaos: Chaos, brain: Brain, fearless: Fearless, ignition: Ignition }
@@ -121,8 +121,9 @@ export default function Play() {
   const [tab, setTab] = useState('mission')
   const [muted, setM] = useState(isMuted())
   const embed = isEmbed()
-  useTimerAlerts(g.ev)
-  const timeUp = useTimeUp(g.ev)
+  const myTimer = timerFor(g.ev, g.stepInfo.phase, g.room)
+  useTimerAlerts(myTimer)
+  const timeUp = useTimeUp(myTimer)
 
   useEffect(() => {
     if (!g.me && g.state.loaded) nav(g.auth === 'facilitator' ? '/facilitator' : g.auth === 'gm' ? '/gm' : '/')
@@ -151,7 +152,7 @@ export default function Play() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <span className="hint hud-step">{g.stepInfo.label}</span>
-            <Timer endsAt={g.ev.endsAt} pausedAt={g.ev.pausedAt} />
+            <Timer {...myTimer} />
             <button className="btn btn-ghost btn-sm" onClick={() => (setMuted(!muted), setM(!muted))} aria-label={muted ? 'Unmute sounds' : 'Mute sounds'}>
               {muted ? '🔇' : '🔊'}
             </button>

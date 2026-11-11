@@ -1,4 +1,4 @@
-import { DEFAULT_EVENT, KEY_PATTERN, MISSIONS, TEAM_CODES, TEAM_IDS, cleanEventPatch, cleanFieldValue, defaultReveal, deriveReveal, roomOfTeam, roundIsOver, stampsOf } from './logic.ts'
+import { DEFAULT_EVENT, KEY_PATTERN, MISSIONS, TEAM_CODES, TEAM_IDS, cleanEventPatch, cleanFieldValue, defaultReveal, deriveReveal, roomOfTeam, applyTimerAction, roundIsOver, stampsOf, TIMER_ACTIONS } from './logic.ts'
 import type { Repo } from './repo.ts'
 
 export type Req = { headers: Record<string, string | undefined>; body: any; ip: string }
@@ -112,7 +112,7 @@ export function createHandler(repo: Repo, env: Env, clock: () => number = Date.n
         if (!gm && !(sess.role === 'player' && sess.team_id === op.team) && !(await facilitatorMay(op.team, op.mission))) {
           throw new HttpError(403, sess.role === 'facilitator' ? 'You can only change the room your team is in right now.' : 'You can only change your own team.')
         }
-        if (sess.role === 'player' && roundIsOver(await repo.getEvent(), clock())) throw new HttpError(403, 'Time is up for this round. Wait for the Game Master.')
+        if (sess.role === 'player' && roundIsOver(await repo.getEvent(), clock(), sess.team_id as string)) throw new HttpError(403, 'Time is up for this round. Wait for the Game Master.')
         if (!TEAM_IDS.includes(op.team) || !MISSIONS.includes(op.mission)) throw bad('Unknown team or room.')
         if (typeof op.key !== 'string' || !KEY_PATTERN.test(op.key)) throw bad('Bad field name.')
         const v = cleanFieldValue(op.value)
@@ -148,6 +148,17 @@ export function createHandler(repo: Repo, env: Env, clock: () => number = Date.n
           if (!ok) throw new HttpError(409, 'Do the reveal steps in order: clue, countdown, then finish.')
         }
         await repo.setReveal(['teams', op.team], op.stage ? { stage: op.stage, startedAt: clock() } : null)
+        return
+      }
+      case 'roomTimer': {
+        // Start, pause, resume, extend or restart one room's timer. Run by the Game Master or by the facilitator of the team in that room.
+        if (!MISSIONS.includes(op.room)) throw bad('Unknown room.')
+        if (!TIMER_ACTIONS.includes(op.action)) throw bad('Bad timer action.')
+        const extra = op.seconds === undefined ? 60 : op.seconds
+        if (!Number.isInteger(extra) || extra < 10 || extra > 600) throw bad('Bad extra time.')
+        const ev = await repo.getEvent()
+        if (!gm && !(await facilitatorMay(sess.team_id, op.room))) throw new HttpError(403, 'Only the Game Master, or the facilitator of the team in that room, can run its timer.')
+        await repo.setRoomTimer(op.room, applyTimerAction((ev as any).roomTimers?.[op.room], op.action, clock(), Number((ev as any).roundSeconds) || 420, extra))
         return
       }
       case 'revealFlag':

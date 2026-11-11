@@ -2,10 +2,11 @@ import { RoomIcon } from '../components/art.jsx'
 import { useEffect, useState } from 'react'
 import { useGame } from '../lib/useGame.jsx'
 import { ROOMS, TEAMS, STEPS } from '../lib/config.js'
-import { missionSummary, roleFor, roomFor, stampsOf, teamPlayers } from '../lib/game.js'
+import { missionSummary, roleFor, roomFor, stampsOf, teamPlayers, timerFor } from '../lib/game.js'
 import { store } from '../lib/store/index.js'
 import { Btn, ConfirmBtn, Panel, TeamChip, Timer } from '../components/ui.jsx'
 import { TwistPanel } from '../components/Twists.jsx'
+import { RoomTimerControls } from '../components/RoomTimerControls.jsx'
 
 export default function Facilitator() {
   const g = useGame()
@@ -116,7 +117,7 @@ function FacilitatorDashboard({ session, onLogout, game }) {
             </div>
             <div style={{ textAlign: 'right' }}>
               <div className="hint">{stepInfo.label}</div>
-              <Timer endsAt={ev.endsAt} pausedAt={ev.pausedAt} size={36} />
+              <Timer {...timerFor(ev, stepInfo.phase, room)} size={36} />
             </div>
           </div>
           <p className="muted" style={{ marginBottom: 0, marginTop: 14 }}>
@@ -186,6 +187,10 @@ function FacilitatorDashboard({ session, onLogout, game }) {
           {room ? (
             <>
               <p className="muted" style={{ marginTop: 0 }}>You can run {team.name} in {ROOMS[room].short} while they are there. The Game Master runs the timer and the other teams.</p>
+              <div style={{ marginBottom: 16 }}>
+                <div className="label">Timer for {ROOMS[room].short}</div>
+                <RoomTimerControls room={room} timer={timerFor(ev, stepInfo.phase, room)} dispatch={dispatch} size={40} />
+              </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
                 <Btn variant={stamps.includes(room) ? 'ghost' : undefined} onClick={() => dispatch({ type: 'teamField', team: session.team, mission: room, key: 'stamp', value: stamps.includes(room) ? null : store.now() })}>
                   {stamps.includes(room) ? 'Take back the stamp' : 'Award the stamp'}

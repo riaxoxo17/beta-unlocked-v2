@@ -3,7 +3,15 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { roomFor, roleFor, ownerIndex } from '../src/lib/game.js'
 import { check } from '../src/lib/check.js'
-import { applyOp, initialState, deriveReveal } from '../src/lib/store/reducer.js'
+import {
+  applyOp,
+  initialState,
+  deriveReveal,
+  applyTimerAction as clientTimer,
+} from '../src/lib/store/reducer.js'
+import {
+  applyTimerAction as serverTimer,
+} from '../supabase/functions/beta-api/logic.ts'
 
 test('rotation matches the planned table', () => {
   const table = {
@@ -50,14 +58,14 @@ test('brain factory answers', () => {
   assert.ok(check('b1.keylock', 'key'))
   assert.ok(check('b1.next', 'plant'))
 
-  // Additional Station 1 observation questions
+  // Additional observation questions
   assert.ok(check('b1.compass-direction', 'N'))
   assert.ok(check('b1.tower', 'spike'))
   assert.ok(check('b1.magnifier', 'fingerprint'))
   assert.ok(check('b1.balloon', 'red'))
   assert.ok(check('b1.globe', 'green'))
 
-  // Station 2: Locker Puzzle
+  // Station 2: Locked Locker
   assert.ok(check('b2.locker', '7'))
 
   // Station 3: Forgotten Library
@@ -71,8 +79,8 @@ test('brain factory answers', () => {
   // Station 5: Number Protocol
   // Stage 1 answer: 48
   // Stage 2 answer: 42
-  // Both answers are validated directly inside Station5.
-  // There is no longer a b5.seq check.
+  // These are validated directly inside Station5.
+  // No b5.seq hash is required.
 
   // Final case unlock
   assert.ok(check('b6.final', '42-854'))
@@ -146,16 +154,28 @@ test('reveal payload never leaks the name early', () => {
     { A: 'clue' }
   )
 
-  // The countdown turns into the name by itself after 5 seconds
+  // Countdown turns into the name automatically after 5 seconds
   const cd = {
     ...on,
     teams: { A: { stage: 'countdown', startedAt: T0 } },
   }
 
-  assert.equal(deriveReveal(ev(cd), vault, 'A', T0 + 4900).reveal.stage, 'countdown')
-  assert.equal(deriveReveal(ev(cd), vault, 'A', T0 + 4900).reveal.name, null)
-  assert.equal(deriveReveal(ev(cd), vault, 'A', T0 + 5000).reveal.name, 'MAST')
-  assert.equal(deriveReveal(ev(cd), vault, 'A', T0 + 5000).reveal.anthemUrl, 'u')
+  assert.equal(
+    deriveReveal(ev(cd), vault, 'A', T0 + 4900).reveal.stage,
+    'countdown'
+  )
+  assert.equal(
+    deriveReveal(ev(cd), vault, 'A', T0 + 4900).reveal.name,
+    null
+  )
+  assert.equal(
+    deriveReveal(ev(cd), vault, 'A', T0 + 5000).reveal.name,
+    'MAST'
+  )
+  assert.equal(
+    deriveReveal(ev(cd), vault, 'A', T0 + 5000).reveal.anthemUrl,
+    'u'
+  )
 
   // Other teams never see A's name before the finale
   const other = deriveReveal(ev(cd), vault, 'B', T0 + 9000)
@@ -196,5 +216,51 @@ test('reveal payload never leaks the name early', () => {
       T0
     ).revealed,
     {}
+  )
+})
+
+test('room timer rules are identical in the browser and on the server', () => {
+  const steps = [
+    ['start', 1000],
+    ['pause', 5000],
+    ['resume', 9000],
+    ['extend', 9500],
+    ['pause', 9600],
+    ['restart', 12000],
+    ['extend', 900000],
+    ['nope', 1],
+  ]
+
+  let a = {
+    seconds: 420,
+    startedAt: null,
+    endsAt: null,
+    pausedAt: null,
+  }
+
+  let b = a
+
+  for (const [action, now] of steps) {
+    a = clientTimer(a, action, now, 420, 60) ?? a
+    b = serverTimer(b, action, now, 420, 60) ?? b
+
+    assert.deepEqual(a, b, action)
+  }
+
+  assert.equal(
+    clientTimer(null, 'start', 100, 300).endsAt,
+    100 + 300000
+  )
+
+  // A timer that has run out is revived by extending it
+  assert.equal(
+    clientTimer(
+      { seconds: 60, startedAt: 0, endsAt: 1000, pausedAt: null },
+      'extend',
+      5000,
+      60,
+      60
+    ).endsAt,
+    65000
   )
 })

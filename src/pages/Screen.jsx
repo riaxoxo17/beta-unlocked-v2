@@ -1,7 +1,7 @@
 import { RoomIcon } from '../components/art.jsx'
 import { useGame } from '../lib/useGame.jsx'
 import { ROOMS, ROOM_ORDER, TEAMS } from '../lib/config.js'
-import { roomFor, stampsOf, rosterOf } from '../lib/game.js'
+import { roomFor, stampsOf, rosterOf, timerFor } from '../lib/game.js'
 import { Timer } from '../components/ui.jsx'
 import { useTimerAlerts } from '../lib/time.js'
 import { FinalReveal, RevealOverlay, VaultDoors } from '../components/Vault.jsx'
@@ -10,7 +10,8 @@ import { FinalReveal, RevealOverlay, VaultDoors } from '../components/Vault.jsx'
 export default function Screen() {
   const { state, ev, stepInfo } = useGame()
   const phase = stepInfo.phase
-  useTimerAlerts(ev)
+  // Four rooms run four timers, so the shared screen stays quiet during rounds. Players hear their own room.
+  useTimerAlerts(phase === 'round' ? {} : timerFor(ev, phase, null))
   return (
     <div className="stage" data-room="hq" style={{ padding: '24px 4vw 40px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
@@ -21,7 +22,7 @@ export default function Screen() {
           <span style={{ fontSize: 'clamp(18px, 2.4vw, 30px)' }} className="muted">
             {stepInfo.label}
           </span>
-          <Timer endsAt={ev.endsAt} pausedAt={ev.pausedAt} size={64} />
+          {phase !== 'round' && <Timer {...timerFor(ev, phase, null)} size={64} />}
         </div>
       </div>
 
@@ -56,6 +57,11 @@ export default function Screen() {
                     'At headquarters'
                   )}
                 </div>
+                {phase === 'round' && roomNow && (
+                  <div style={{ margin: '0 0 12px' }}>
+                    <Timer {...timerFor(ev, phase, roomNow)} size={34} />
+                  </div>
+                )}
                 <div style={{ display: 'flex', gap: 8 }} aria-label={`${stamps.length} of 4 stamps`}>
                   {ROOM_ORDER.map((r) => (
                     <span key={r} title={ROOMS[r].short} style={{ width: 34, height: 34, borderRadius: '50%', display: 'grid', placeItems: 'center', border: `2px ${stamps.includes(r) ? 'solid' : 'dashed'} ${stamps.includes(r) ? t.color : 'var(--line)'}`, opacity: stamps.includes(r) ? 1 : 0.4 }}>
