@@ -4,25 +4,52 @@ export const TEAM_IDS = Object.keys(TEAM_CODES)
 export const MISSIONS = ['chaos', 'brain', 'fearless', 'ignition']
 export const ROOM_ORDER = ['chaos', 'brain', 'fearless', 'ignition']
 
+// Every team has its own place in the game: event.teamRun[team] = { step, stepStartedAt, timer }.
+// Teams without a run follow event.step (the old shared step), which keeps old data working.
+export const PHASES = ['lobby', 'round', 'transition', 'round', 'transition', 'round', 'transition', 'round', 'hq', 'vault']
+export const LAST_STEP = PHASES.length - 1
+export const phaseOfStep = (step: number): string => PHASES[step] ?? 'lobby'
+export function teamStep(event: any, team: string): number {
+  return Number(event?.teamRun?.[team]?.step ?? event?.step ?? 0)
+}
+
 // The room a team is in right now, or null between rooms. Same rotation as the browser (src/lib/game.js).
 export function roomOfTeam(event: any, team: string): string | null {
-  const step = Number(event?.step ?? 0)
-  const isRound = step >= 1 && step <= 7 && step % 2 === 1
-  if (!isRound) return null
+  const step = teamStep(event, team)
+  if (phaseOfStep(step) !== 'round') return null
   const round = (step + 1) / 2
   const idx = TEAM_IDS.indexOf(team)
   return idx < 0 ? null : ROOM_ORDER[(idx + round - 1) % ROOM_ORDER.length]
 }
 
-// True once a round's timer has run out (and is not paused). Players cannot write after this, so time is a hard stop.
-export const HARD_STOP_GRACE_MS = 2000
-export function roundIsOver(event: any, now: number, team: string): boolean {
-  const room = roomOfTeam(event, team)
-  const t = room ? event?.roomTimers?.[room] : null
-  return !!t && typeof t.endsAt === 'number' && !t.pausedAt && now > t.endsAt + HARD_STOP_GRACE_MS
+export function stepSeconds(step: number, event: any): number {
+  const ph = phaseOfStep(step)
+  if (ph === 'round') return Number(event?.roundSeconds) || 420
+  if (ph === 'transition') return Number(event?.transitionSeconds) || 60
+  if (ph === 'hq') return Number(event?.hqSeconds) || 300
+  return 0
 }
 
-// Each room runs its own timer. The same rules run in the browser (src/lib/store/reducer.js), so keep them identical.
+// A team's fresh run for a step. In manual-start mode a round timer waits for a facilitator to press Start.
+export function freshRun(event: any, step: number, now: number) {
+  const dur = stepSeconds(step, event)
+  const waits = !!event?.manualStart && phaseOfStep(step) === 'round'
+  return {
+    step,
+    stepStartedAt: now,
+    timer: dur ? { seconds: dur, startedAt: waits ? null : now, endsAt: waits ? null : now + dur * 1000, pausedAt: null } : null,
+  }
+}
+
+// True once a team's round timer has run out (and is not paused). Players cannot write after this, so time is a hard stop.
+export const HARD_STOP_GRACE_MS = 2000
+export function roundIsOver(event: any, now: number, team: string): boolean {
+  const t = event?.teamRun?.[team]?.timer
+  if (!t || phaseOfStep(teamStep(event, team)) !== 'round') return false
+  return typeof t.endsAt === 'number' && !t.pausedAt && now > t.endsAt + HARD_STOP_GRACE_MS
+}
+
+// Each team runs its own timer. The same rules run in the browser (src/lib/store/reducer.js), so keep them identical.
 export const TIMER_ACTIONS = ['start', 'pause', 'resume', 'extend', 'restart']
 export function applyTimerAction(timer: any, action: string, now: number, roundSeconds = 420, extra = 60) {
   const t = { seconds: Number(timer?.seconds) || roundSeconds, startedAt: timer?.startedAt ?? null, endsAt: timer?.endsAt ?? null, pausedAt: timer?.pausedAt ?? null }
@@ -66,7 +93,7 @@ export const DEFAULT_EVENT = {
   stepStartedAt: null,
   endsAt: null,
   pausedAt: null,
-  roomTimers: {} as Record<string, unknown>,
+  teamRun: {} as Record<string, unknown>,
   manualStart: false,
   betaTarget: 1000000,
   roundSeconds: 420,
@@ -149,18 +176,6 @@ export function cleanEventPatch(patch: any, current: any): { ok: true; value: Re
         if (!isInt(v, 10000, 1000000000)) return { ok: false, error: `Bad ${k}.` }
         out[k] = v
         break
-      case 'roomTimers': {
-        // Only the Game Master sets all four at once, when a round starts.
-        if (!v || typeof v !== 'object' || Array.isArray(v)) return { ok: false, error: 'Bad roomTimers.' }
-        const clean: Record<string, unknown> = {}
-        for (const [room, t] of Object.entries(v as Record<string, any>)) {
-          if (!MISSIONS.includes(room) || !t || typeof t !== 'object') return { ok: false, error: 'Bad roomTimers.' }
-          if (!isInt(t.seconds, 5, 7200) || !isTime(t.startedAt ?? null) || !isTime(t.endsAt ?? null) || !isTime(t.pausedAt ?? null)) return { ok: false, error: 'Bad roomTimers.' }
-          clean[room] = { seconds: t.seconds, startedAt: t.startedAt ?? null, endsAt: t.endsAt ?? null, pausedAt: t.pausedAt ?? null }
-        }
-        out[k] = clean
-        break
-      }
       case 'manualStart':
       case 'auto':
         if (typeof v !== 'boolean') return { ok: false, error: `Bad ${k}.` }

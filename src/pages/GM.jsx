@@ -1,11 +1,11 @@
 import { TwistPanel } from '../components/Twists.jsx'
-import { RoomTimerControls } from '../components/RoomTimerControls.jsx'
+import { TeamTimerControls, TeamStepMover } from '../components/TeamTimerControls.jsx'
 import { DEFAULT_TARGET } from '../lib/ignition.js'
 import { RoomIcon } from '../components/art.jsx'
 import { useEffect, useRef, useState } from 'react'
 import { useGame } from '../lib/useGame.jsx'
 import { ROOMS, ROOM_ORDER, STEPS, TEAMS, COUNTDOWN_SECONDS } from '../lib/config.js'
-import { missionSummary, roleFor, roomFor, stampsOf, stepDuration, teamPlayers, timerFor } from '../lib/game.js'
+import { missionSummary, roleFor, roomFor, stampsOf, stepOf, stepInfoOf, teamPlayers, timerFor } from '../lib/game.js'
 import { store } from '../lib/store/index.js'
 import { Btn, ConfirmBtn, Panel, Timer } from '../components/ui.jsx'
 
@@ -65,36 +65,33 @@ function Dashboard({ code }) {
   const { state, ev, stepInfo, dispatch } = useGame()
   const last = STEPS.length - 1
 
-  const goStep = (n) => {
-    const i = Math.max(0, Math.min(last, n))
-    const dur = stepDuration(i, ev)
-    const now = store.now()
-    if (STEPS[i].phase === 'round') {
-      // Every room gets its own timer. With "rooms wait for their facilitator" on, they start as ready and the facilitator presses Start.
-      const fresh = { seconds: dur, startedAt: ev.manualStart ? null : now, endsAt: ev.manualStart ? null : now + dur * 1000, pausedAt: null }
-      dispatch({ type: 'event', patch: { step: i, stepStartedAt: now, endsAt: null, pausedAt: null, roomTimers: Object.fromEntries(ROOM_ORDER.map((r) => [r, fresh])) } }, code)
-    } else {
-      dispatch({ type: 'event', patch: { step: i, stepStartedAt: now, endsAt: dur ? now + dur * 1000 : null, pausedAt: null, roomTimers: {} } }, code)
-    }
-  }
+  const run = (op) => dispatch(op, code)
+  const moveTeam = (team, n) => run({ type: 'teamStep', team, step: Math.max(0, Math.min(last, n)), at: store.now() })
+  const moveAll = (n) => TEAMS.forEach((t) => moveTeam(t.id, n))
+  const allSteps = TEAMS.map((t) => stepOf(ev, t.id))
+  const minStep = Math.min(...allSteps)
+  const maxStep = Math.max(...allSteps)
+  const timerAll = (action) => TEAMS.forEach((t) => timerFor(ev, t.id).seconds != null && run({ type: 'teamTimer', team: t.id, action, at: store.now() }))
 
-  // Optional auto-advance, only while this dashboard stays open.
-  const stateRef = useRef({ ev, goStep })
-  stateRef.current = { ev, goStep }
+  // Optional auto-advance per team, only while this dashboard stays open.
+  const stateRef = useRef({ ev, moveTeam })
+  stateRef.current = { ev, moveTeam }
   useEffect(() => {
     const id = setInterval(() => {
-      const { ev: e, goStep: go } = stateRef.current
-      const ph = STEPS[e.step].phase
+      const { ev: e, moveTeam: mv } = stateRef.current
+      if (!e.auto) return
       const n = store.now()
-      const over = (t) => t && t.endsAt && !t.pausedAt && n > t.endsAt
-      if (e.auto && ph === 'round' && ROOM_ORDER.every((r) => over(e.roomTimers?.[r]))) go(e.step + 1)
-      if (e.auto && ph === 'transition' && over({ endsAt: e.endsAt, pausedAt: e.pausedAt })) go(e.step + 1)
+      TEAMS.forEach((t) => {
+        const st = stepOf(e, t.id)
+        const ph = STEPS[st].phase
+        const tm = e.teamRun?.[t.id]?.timer
+        if ((ph === 'round' || ph === 'transition') && tm?.endsAt && !tm.pausedAt && n > tm.endsAt) mv(t.id, st + 1)
+      })
     }, 1000)
     return () => clearInterval(id)
   }, [])
 
   const patch = (p) => dispatch({ type: 'event', patch: p }, code)
-  const nextLabel = ev.step < last ? STEPS[ev.step + 1].label : 'End'
   const playerCount = (state.roster || Object.values(state.players)).length
 
   return (
@@ -114,54 +111,44 @@ function Dashboard({ code }) {
         <Panel>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
             <div>
-              <div className="hint">Now ({ev.step + 1}/{STEPS.length})</div>
-              <h2>{stepInfo.label}</h2>
+              <div className="hint">Every team runs its own steps and timer</div>
+              <h2>{minStep === maxStep ? STEPS[minStep].label : 'Teams are at different steps'}</h2>
             </div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <Btn variant="ghost" disabled={ev.step === 0} onClick={() => goStep(ev.step - 1)}>Back</Btn>
-              <Btn disabled={ev.step === last} onClick={() => goStep(ev.step + 1)}>Next: {nextLabel}</Btn>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span className="hint">All teams</span>
+              <Btn small variant="ghost" disabled={minStep === 0} onClick={() => TEAMS.forEach((t) => moveTeam(t.id, stepOf(ev, t.id) - 1))}>Back</Btn>
+              <Btn small disabled={maxStep === last} onClick={() => TEAMS.forEach((t) => moveTeam(t.id, stepOf(ev, t.id) + 1))}>Next</Btn>
+              <Btn small variant="ghost" onClick={() => timerAll('start')}>Start all timers</Btn>
+              <Btn small variant="ghost" onClick={() => timerAll('pause')}>Pause all</Btn>
+              <Btn small variant="ghost" onClick={() => timerAll('resume')}>Resume all</Btn>
             </div>
           </div>
 
-          {stepInfo.phase === 'round' ? (
-            <div style={{ marginTop: 16 }}>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
-                <b>Room timers</b>
-                <span className="hint">Each facilitator can run their own room. You can run any of them.</span>
-                <Btn small variant="ghost" onClick={() => ROOM_ORDER.forEach((r) => dispatch({ type: 'roomTimer', room: r, action: 'start', at: store.now() }, code))}>Start all</Btn>
-                <Btn small variant="ghost" onClick={() => ROOM_ORDER.forEach((r) => dispatch({ type: 'roomTimer', room: r, action: 'pause', at: store.now() }, code))}>Pause all</Btn>
-                <Btn small variant="ghost" onClick={() => ROOM_ORDER.forEach((r) => dispatch({ type: 'roomTimer', room: r, action: 'resume', at: store.now() }, code))}>Resume all</Btn>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 12 }}>
-                {ROOM_ORDER.map((r) => {
-                  const here = TEAMS.find((t) => roomFor(t.id, stepInfo.round) === r)
-                  return (
-                    <div key={r} style={{ border: '1px solid var(--line)', borderRadius: 12, padding: 12, borderColor: here?.color }}>
-                      <b><RoomIcon room={r} size={16} /> {ROOMS[r].short}</b>
-                      <div className="hint" style={{ marginBottom: 8 }}>{here ? `${here.name} is here` : 'Empty'}</div>
-                      <RoomTimerControls room={r} timer={timerFor(ev, 'round', r)} dispatch={(op) => dispatch(op, code)} size={30} />
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginTop: 14 }}>
-              <Timer endsAt={ev.endsAt} pausedAt={ev.pausedAt} size={44} />
-              <Btn small variant="ghost" disabled={!ev.endsAt} onClick={() => (ev.pausedAt ? patch({ endsAt: ev.endsAt + (store.now() - ev.pausedAt), pausedAt: null }) : patch({ pausedAt: store.now() }))}>
-                {ev.pausedAt ? 'Resume timer' : 'Pause timer'}
-              </Btn>
-              <Btn small variant="ghost" disabled={!ev.endsAt} onClick={() => patch({ endsAt: ev.endsAt + 60000 })}>+1 min</Btn>
-            </div>
-          )}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12, marginTop: 16 }}>
+            {TEAMS.map((t) => {
+              const st = stepOf(ev, t.id)
+              const si = STEPS[st]
+              const room = si.phase === 'round' ? roomFor(t.id, si.round) : null
+              return (
+                <div key={t.id} style={{ border: '1px solid var(--line)', borderColor: t.color, borderRadius: 12, padding: 12, display: 'grid', gap: 10 }}>
+                  <div>
+                    <b><span className="dot" style={{ '--c': t.color }} /> {t.name}</b>
+                    <div className="hint">{si.label}{room ? `, ${ROOMS[room].short}` : ''}</div>
+                  </div>
+                  <TeamTimerControls team={t.id} timer={timerFor(ev, t.id)} dispatch={run} size={30} />
+                  <TeamStepMover team={t.id} step={st} dispatch={run} gm />
+                </div>
+              )
+            })}
+          </div>
           <div style={{ display: 'flex', gap: 22, flexWrap: 'wrap', marginTop: 16, alignItems: 'center' }}>
             <label><input type="checkbox" checked={!!ev.manualStart} onChange={(e) => patch({ manualStart: e.target.checked })} /> Rooms wait for their facilitator to press Start</label>
-            <label><input type="checkbox" checked={ev.auto} onChange={(e) => patch({ auto: e.target.checked })} /> Auto-advance when every room has finished, and after moves (this tab must stay open)</label>
+            <label><input type="checkbox" checked={ev.auto} onChange={(e) => patch({ auto: e.target.checked })} /> Move each team on when its own timer ends (this tab must stay open)</label>
             <label>Round <input type="number" min="1" max="15" className="input" style={{ width: 70, display: 'inline-block' }} value={Math.round(ev.roundSeconds / 60)} onChange={(e) => patch({ roundSeconds: Math.max(1, +e.target.value) * 60 })} /> min</label>
             <label>Target per Betta ₹ <input type="number" min="10000" step="10000" className="input" style={{ width: 130, display: 'inline-block' }} value={ev.betaTarget || 1000000} onChange={(e) => patch({ betaTarget: Math.max(10000, +e.target.value || 1000000) })} /></label>
             <label>Move <input type="number" min="10" max="300" className="input" style={{ width: 80, display: 'inline-block' }} value={ev.transitionSeconds} onChange={(e) => patch({ transitionSeconds: Math.max(10, +e.target.value) })} /> sec</label>
           </div>
-          <p className="hint" style={{ marginBottom: 0 }}>Round length and the start setting apply from the next round.</p>
+          <p className="hint" style={{ marginBottom: 0 }}>Round length and the start setting apply the next time a team moves to a step.</p>
         </Panel>
 
         <div className="tabs" role="tablist" style={{ borderBottom: '1px solid var(--line)' }}>
@@ -273,7 +260,8 @@ function FacilitatorAssignments({ code }) {
 }
 
 function TeamCard({ team, code }) {
-  const { state, ev, stepInfo, dispatch } = useGame()
+  const { state, ev, dispatch } = useGame()
+  const stepInfo = stepInfoOf(ev, team.id)
   const players = teamPlayers(state, team.id)
   const progress = state.teams[team.id].progress
   const stamps = stampsOf(state, team.id)

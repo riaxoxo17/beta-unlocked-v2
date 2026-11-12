@@ -102,7 +102,7 @@ function TeamRoster() {
 }
 
 function Transition() {
-  const { nextRoom, ev } = useGame()
+  const { nextRoom, ev, teamId } = useGame()
   const r = ROOMS[nextRoom]
   return (
     <Panel style={{ textAlign: 'center', padding: 40 }}>
@@ -111,7 +111,7 @@ function Transition() {
       <p className="muted" style={{ marginTop: 0 }}>
         Head there together. Roles rotate, so check yours when you arrive.
       </p>
-      <Timer endsAt={ev.endsAt} pausedAt={ev.pausedAt} size={48} />
+      <Timer {...timerFor(ev, teamId)} size={48} />
     </Panel>
   )
 }
@@ -121,7 +121,7 @@ export default function Play() {
   const [tab, setTab] = useState('mission')
   const [muted, setM] = useState(isMuted())
   const embed = isEmbed()
-  const myTimer = timerFor(g.ev, g.stepInfo.phase, g.room)
+  const myTimer = timerFor(g.ev, g.teamId)
   useTimerAlerts(myTimer)
   const timeUp = useTimeUp(myTimer)
 

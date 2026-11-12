@@ -1,4 +1,4 @@
-import { TEAMS, COUNTDOWN_SECONDS } from '../config.js'
+import { TEAMS, COUNTDOWN_SECONDS, STEPS } from '../config.js'
 
 export const blankProgress = () => ({ chaos: {}, brain: {}, fearless: {}, ignition: {} })
 // Reveal state. `teams[T]` is { stage: 'clue' | 'countdown' | 'name' | 'done', startedAt } and is run by that team's facilitator.
@@ -9,7 +9,7 @@ export const defaultEvent = () => ({
   stepStartedAt: null,
   endsAt: null,
   pausedAt: null,
-  roomTimers: {},
+  teamRun: {},
   manualStart: false,
   betaTarget: 1000000,
   roundSeconds: 420,
@@ -34,6 +34,27 @@ export const initialState = () => ({
 })
 
 // Each room runs its own timer. Same rules as supabase/functions/beta-api/logic.ts, so keep them identical.
+// Each team has its own place in the game: event.teamRun[team] = { step, stepStartedAt, timer }.
+// Teams without a run follow event.step. Keep these in step with supabase/functions/beta-api/logic.ts.
+export const LAST_STEP = STEPS.length - 1
+export const teamStep = (event, team) => Number(event?.teamRun?.[team]?.step ?? event?.step ?? 0)
+export function stepSeconds(step, event) {
+  const ph = STEPS[step]?.phase
+  if (ph === 'round') return Number(event?.roundSeconds) || 420
+  if (ph === 'transition') return Number(event?.transitionSeconds) || 60
+  if (ph === 'hq') return Number(event?.hqSeconds) || 300
+  return 0
+}
+export function freshRun(event, step, now) {
+  const dur = stepSeconds(step, event)
+  const waits = !!event?.manualStart && STEPS[step]?.phase === 'round'
+  return {
+    step,
+    stepStartedAt: now,
+    timer: dur ? { seconds: dur, startedAt: waits ? null : now, endsAt: waits ? null : now + dur * 1000, pausedAt: null } : null,
+  }
+}
+
 export function applyTimerAction(timer, action, now, roundSeconds = 420, extra = 60) {
   const t = { seconds: Number(timer?.seconds) || roundSeconds, startedAt: timer?.startedAt ?? null, endsAt: timer?.endsAt ?? null, pausedAt: timer?.pausedAt ?? null }
   switch (action) {
@@ -73,9 +94,16 @@ export function applyOp(state, op) {
     case 'event':
       Object.assign(s.event, op.patch)
       break
-    case 'roomTimer': {
-      const t = applyTimerAction(s.event.roomTimers?.[op.room], op.action, op.at ?? Date.now(), s.event.roundSeconds, op.seconds ?? 60)
-      if (t) s.event.roomTimers = { ...s.event.roomTimers, [op.room]: t }
+    case 'teamTimer': {
+      const run = s.event.teamRun?.[op.team]
+      if (!run?.timer) break
+      const t = applyTimerAction(run.timer, op.action, op.at ?? Date.now(), s.event.roundSeconds, op.seconds ?? 60)
+      if (t) s.event.teamRun = { ...s.event.teamRun, [op.team]: { ...run, timer: t } }
+      break
+    }
+    case 'teamStep': {
+      if (!Number.isInteger(op.step) || op.step < 0 || op.step > LAST_STEP) break
+      s.event.teamRun = { ...s.event.teamRun, [op.team]: freshRun(s.event, op.step, op.at ?? Date.now()) }
       break
     }
     case 'teamField': {

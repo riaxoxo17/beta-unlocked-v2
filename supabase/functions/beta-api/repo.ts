@@ -8,7 +8,7 @@ export function createRepo(rpc: Rpc) {
     getEvent: () => call('api_get_event'),
     patchEvent: (patch: unknown) => call('api_patch_event', { patch }),
     setReveal: (path: string[], value: unknown) => call('api_set_reveal', { path, value }),
-    setRoomTimer: (room: string, timer: unknown) => call('api_set_room_timer', { room, timer }),
+    setTeamRun: (team: string, run: unknown) => call('api_set_team_run', { team, run }),
     getTeams: (team?: string) => call('api_get_teams', team ? { team } : {}),
     patchTeamField: (team: string, mission: string, key: string, value: unknown) => call('api_patch_team_field', { team, mission, key, value }),
     resetMission: (team: string, mission: string) => call('api_reset_mission', { team, mission }),

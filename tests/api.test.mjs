@@ -324,7 +324,7 @@ test('find your match: each player keeps their own entries', async () => {
   assert.equal(f[`c1:food:who:${b.body.player.id}`], 'Kunal')
 })
 
-test('room timers: each room runs its own clock, facilitators and the Game Master control it, players are stopped at zero', async () => {
+test('team progress: each team has its own step and clock, facilitators move and time their own team, players are stopped at zero', async () => {
   const { call, clock } = await setup()
   const gm = (await call({ action: 'gmLogin', code: 'secret-gm' }, undefined, 'g')).body.token
   await call({ action: 'facilitatorAssign', team: 'A', name: 'Fay', code: 'fac-a' }, gm)
@@ -333,39 +333,56 @@ test('room timers: each room runs its own clock, facilitators and the Game Maste
   const fb = (await call({ action: 'facilitatorLogin', code: 'fac-b' }, undefined, 'fb')).body.token
   const a = await join(call, 'A', 'PURPLE', 'Asha')
   const t0 = clock.t
-  const fresh = { seconds: 600, startedAt: null, endsAt: null, pausedAt: null }
-  const rooms = { chaos: fresh, brain: fresh, fearless: fresh, ignition: fresh }
-  // Round 1: team A is in chaos, team B in brain. Timers are ready but not started.
-  assert.equal((await call({ action: 'dispatch', op: { type: 'event', patch: { step: 1, stepStartedAt: t0, endsAt: null, pausedAt: null, roomTimers: rooms } } }, gm)).status, 200)
-  const write = (v) => call({ action: 'dispatch', op: { type: 'teamField', team: 'A', mission: 'chaos', key: 'x', value: v } }, a.body.token)
-  const timers = async () => (await call({ action: 'getState' }, gm)).body.event.roomTimers
-  const act = (who, room, action, extra) => call({ action: 'dispatch', op: { type: 'roomTimer', room, action, ...(extra ? { seconds: extra } : {}) } }, who)
+  const R = 420000
+  const dispatch = (who, op) => call({ action: 'dispatch', op }, who)
+  const write = (v) => dispatch(a.body.token, { type: 'teamField', team: 'A', mission: 'chaos', key: 'x', value: v })
+  const run = async (team) => (await call({ action: 'getState' }, gm)).body.event.teamRun?.[team]
+
+  // Rooms wait for their facilitator. The Game Master sends A and B into round 1; C and D stay at HQ.
+  assert.equal((await dispatch(gm, { type: 'event', patch: { manualStart: true } })).status, 200)
+  assert.equal((await dispatch(gm, { type: 'teamStep', team: 'A', step: 1 })).status, 200)
+  assert.equal((await dispatch(gm, { type: 'teamStep', team: 'B', step: 1 })).status, 200)
+  assert.equal((await run('A')).step, 1)
+  assert.equal((await run('A')).timer.endsAt, null, 'timer is ready, not started')
+  assert.equal(await run('C'), undefined, 'other teams are untouched')
 
   assert.equal((await write('ready')).status, 200, 'no hard stop before the timer starts')
-  assert.equal((await act(fa, 'chaos', 'start')).status, 200, 'a facilitator starts their own room')
-  assert.equal((await act(fa, 'brain', 'start')).status, 403, 'but not another room')
-  assert.equal((await act(fb, 'chaos', 'start')).status, 403, 'and not a room their team is not in')
-  assert.equal((await act(a.body.token, 'chaos', 'pause')).status, 403, 'players cannot touch timers')
-  let t = await timers()
-  assert.equal(t.chaos.endsAt, t0 + 600000)
-  assert.equal(t.brain.endsAt, null, 'other rooms are untouched')
+  assert.equal((await dispatch(fa, { type: 'teamTimer', team: 'A', action: 'start' })).status, 200, 'a facilitator starts their own team')
+  assert.equal((await dispatch(fa, { type: 'teamTimer', team: 'B', action: 'start' })).status, 403, 'but not another team')
+  assert.equal((await dispatch(a.body.token, { type: 'teamTimer', team: 'A', action: 'pause' })).status, 403, 'players cannot touch timers')
+  assert.equal((await run('A')).timer.endsAt, t0 + R)
+  assert.equal((await run('B')).timer.endsAt, null)
 
   clock.t = t0 + 100000
-  assert.equal((await act(fa, 'chaos', 'pause')).status, 200)
+  assert.equal((await dispatch(fa, { type: 'teamTimer', team: 'A', action: 'pause' })).status, 200)
   clock.t = t0 + 400000
   assert.equal((await write('while paused')).status, 200)
-  assert.equal((await act(fa, 'chaos', 'resume')).status, 200)
-  t = await timers()
-  assert.equal(t.chaos.endsAt, t0 + 600000 + 300000, 'resume adds the paused time back')
-  assert.equal((await act(gm, 'chaos', 'extend', 120)).status, 200)
-  assert.equal((await timers()).chaos.endsAt, t0 + 600000 + 300000 + 120000)
-  assert.equal((await act(gm, 'chaos', 'extend', 5)).status, 400)
+  assert.equal((await dispatch(fa, { type: 'teamTimer', team: 'A', action: 'resume' })).status, 200)
+  assert.equal((await run('A')).timer.endsAt, t0 + R + 300000, 'resume adds the paused time back')
+  assert.equal((await dispatch(gm, { type: 'teamTimer', team: 'A', action: 'extend', seconds: 120 })).status, 200)
+  assert.equal((await run('A')).timer.endsAt, t0 + R + 300000 + 120000)
+  assert.equal((await dispatch(gm, { type: 'teamTimer', team: 'A', action: 'extend', seconds: 5 })).status, 400)
 
   clock.t = t0 + 2000000
-  assert.equal((await write('too late')).status, 403, 'hard stop when the room timer is over')
-  assert.equal((await act(gm, 'chaos', 'restart')).status, 200)
+  assert.equal((await write('too late')).status, 403, 'hard stop when the team timer is over')
+  assert.equal((await dispatch(gm, { type: 'teamTimer', team: 'A', action: 'restart' })).status, 200)
   assert.equal((await write('again')).status, 200)
-  // the Game Master can start a room whose facilitator has not
-  assert.equal((await act(gm, 'brain', 'start')).status, 200)
-  assert.equal((await call({ action: 'dispatch', op: { type: 'event', patch: { roomTimers: { nope: fresh } } } }, gm)).status, 400)
+  assert.equal((await dispatch(gm, { type: 'teamTimer', team: 'B', action: 'start' })).status, 200, 'the Game Master can start any team')
+  assert.equal((await dispatch(gm, { type: 'teamTimer', team: 'C', action: 'start' })).status, 409, 'no timer at HQ')
+
+  // Moving on: a facilitator moves their own team one step at a time.
+  assert.equal((await dispatch(fa, { type: 'teamStep', team: 'A', step: 2 })).status, 200)
+  assert.equal((await run('A')).step, 2)
+  assert.equal((await run('A')).timer.seconds, 60, 'the move has its own timer')
+  assert.equal((await run('B')).step, 1, 'B did not move')
+  assert.equal((await dispatch(fa, { type: 'teamStep', team: 'A', step: 4 })).status, 403, 'no skipping ahead')
+  assert.equal((await dispatch(fa, { type: 'teamStep', team: 'B', step: 2 })).status, 403, 'not another team')
+  assert.equal((await dispatch(fb, { type: 'teamStep', team: 'A', step: 3 })).status, 403)
+  assert.equal((await dispatch(a.body.token, { type: 'teamStep', team: 'A', step: 3 })).status, 403, 'players cannot move')
+  assert.equal((await dispatch(fa, { type: 'teamStep', team: 'A', step: 1 })).status, 200, 'and can go back')
+  assert.equal((await dispatch(gm, { type: 'teamStep', team: 'A', step: 99 })).status, 400)
+  assert.equal((await dispatch(gm, { type: 'teamStep', team: 'A', step: 9 })).status, 200, 'the Game Master can go anywhere')
+  assert.equal((await dispatch(fa, { type: 'teamStep', team: 'A', step: 8 })).status, 403, 'a facilitator cannot move from the vault')
+  assert.equal((await dispatch(gm, { type: 'teamStep', team: 'A', step: 0 })).status, 200)
+  assert.equal((await dispatch(fa, { type: 'teamStep', team: 'A', step: 1 })).status, 403, 'a facilitator cannot start the event from HQ')
 })

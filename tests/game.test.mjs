@@ -1,17 +1,23 @@
 
 import test from 'node:test'
 import assert from 'node:assert/strict'
+
 import { roomFor, roleFor, ownerIndex } from '../src/lib/game.js'
 import { check } from '../src/lib/check.js'
+
 import {
   applyOp,
   initialState,
   deriveReveal,
   applyTimerAction as clientTimer,
+  freshRun as clientRun,
 } from '../src/lib/store/reducer.js'
+
 import {
   applyTimerAction as serverTimer,
+  freshRun as serverRun,
 } from '../supabase/functions/beta-api/logic.ts'
+
 
 test('rotation matches the planned table', () => {
   const table = {
@@ -31,6 +37,7 @@ test('rotation matches the planned table', () => {
   }
 })
 
+
 test('roles rotate every round and cover all five', () => {
   for (let r = 1; r <= 5; r++) {
     assert.equal(
@@ -42,12 +49,14 @@ test('roles rotate every round and cover all five', () => {
   assert.notEqual(roleFor(0, 1).id, roleFor(0, 2).id)
 })
 
+
 test('items are shared round-robin for small teams', () => {
   assert.deepEqual(
     [0, 1, 2, 3, 4].map((i) => ownerIndex(i, 3)),
     [0, 1, 2, 0, 1]
   )
 })
+
 
 test('brain factory answers', () => {
   // Station 1: Observation Desk
@@ -58,7 +67,7 @@ test('brain factory answers', () => {
   assert.ok(check('b1.keylock', 'key'))
   assert.ok(check('b1.next', 'plant'))
 
-  // Additional observation questions
+  // Additional Station 1 observation questions
   assert.ok(check('b1.compass-direction', 'N'))
   assert.ok(check('b1.tower', 'spike'))
   assert.ok(check('b1.magnifier', 'fingerprint'))
@@ -79,6 +88,7 @@ test('brain factory answers', () => {
   // Station 5: Number Protocol
   // Stage 1 answer: 48
   // Stage 2 answer: 42
+  // Product: 2016
   // These are validated directly inside Station5.
   // No b5.seq hash is required.
 
@@ -86,6 +96,7 @@ test('brain factory answers', () => {
   assert.ok(check('b6.final', '42-854'))
   assert.ok(!check('b6.final', '42855'))
 })
+
 
 test('reducer writes and clears team fields', () => {
   let s = initialState()
@@ -110,6 +121,7 @@ test('reducer writes and clears team fields', () => {
 
   assert.equal(s.teams.A.progress.chaos.name, undefined)
 })
+
 
 test('reveal payload never leaks the name early', () => {
   const vault = {
@@ -164,14 +176,17 @@ test('reveal payload never leaks the name early', () => {
     deriveReveal(ev(cd), vault, 'A', T0 + 4900).reveal.stage,
     'countdown'
   )
+
   assert.equal(
     deriveReveal(ev(cd), vault, 'A', T0 + 4900).reveal.name,
     null
   )
+
   assert.equal(
     deriveReveal(ev(cd), vault, 'A', T0 + 5000).reveal.name,
     'MAST'
   )
+
   assert.equal(
     deriveReveal(ev(cd), vault, 'A', T0 + 5000).reveal.anthemUrl,
     'u'
@@ -202,6 +217,7 @@ test('reveal payload never leaks the name early', () => {
   const fin = deriveReveal(ev({ ...on, final: true }), vault, null, T0)
 
   assert.equal(fin.final, true)
+
   assert.deepEqual(
     Object.keys(fin.revealed).sort(),
     ['A', 'B', 'C', 'D']
@@ -218,6 +234,7 @@ test('reveal payload never leaks the name early', () => {
     {}
   )
 })
+
 
 test('room timer rules are identical in the browser and on the server', () => {
   const steps = [
@@ -263,4 +280,23 @@ test('room timer rules are identical in the browser and on the server', () => {
     ).endsAt,
     65000
   )
+})
+
+
+test('a team moving to a step gets the same fresh run in the browser and on the server', () => {
+  const ev = {
+    roundSeconds: 420,
+    transitionSeconds: 60,
+    hqSeconds: 300,
+    manualStart: false,
+  }
+
+  for (const manualStart of [false, true]) {
+    for (let step = 0; step <= 9; step++) {
+      assert.deepEqual(
+        clientRun({ ...ev, manualStart }, step, 5000),
+        serverRun({ ...ev, manualStart }, step, 5000)
+      )
+    }
+  }
 })

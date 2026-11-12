@@ -2,7 +2,7 @@ import { RoomIcon } from '../../components/art.jsx'
 import { useEffect, useState } from 'react'
 import { useMission } from '../../lib/useGame.jsx'
 import { TEAMS, ROOMS } from '../../lib/config.js'
-import { roomFor } from '../../lib/game.js'
+import { roomFor, stepOf } from '../../lib/game.js'
 import { Btn, Panel, SharedField, useAutoStamp } from '../../components/ui.jsx'
 import { store } from '../../lib/store/index.js'
 import { sfx } from '../../lib/audio.js'
@@ -15,12 +15,12 @@ const TRAITS = [
 
 // Courage dares. Each player dares the next teammate in the ring, who does it out loud.
 export const DARES = [
-  'Tell the team about a mistake you made as a volunteer and what it taught you. 60 seconds.',
-  'Admit one thing about running your chapter that you are unsure about, then ask the team for an idea.',
-  'Give every teammate one specific compliment, out loud, with no jokes.',
-  'Say what you are most nervous about this year and what would help.',
-  'Teach the team one thing you are good at in 60 seconds.',
-  'Describe a moment you were proud of yourself that you never told anyone about.',
+  'Sell your water bottle like its a ₹10 crore startup',
+  'Speak only in questions for the next 2 minutes',
+  'Introduce yourself like you are entering Bigg Boss.',
+  'Pretend your internet is lagging, but only through dramatic facial expressions.',
+  'Talk like Google Maps giving directions for the next minute.',
+  'Pretend you are a contestant on a reality show and introduce your biggest enemy: Monday.',
 ]
 
 const SCENARIOS = [
@@ -71,9 +71,8 @@ export default function Fearless() {
   useAutoStamp(c1 && c2 && c3, p.stamp, set)
 
   const rosterOthers = (state.roster || Object.values(state.players)).filter((pl) => pl.team !== teamId)
-  const stepRound = state.event.step
   const whereIs = (team) => {
-    const s = state.event.step
+    const s = stepOf(state.event, team)
     const info = [1, 3, 5, 7].indexOf(s)
     return info >= 0 ? ROOMS[roomFor(team, info + 1)].short : 'between rooms'
   }

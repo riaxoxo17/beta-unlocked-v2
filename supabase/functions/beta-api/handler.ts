@@ -1,4 +1,4 @@
-import { DEFAULT_EVENT, KEY_PATTERN, MISSIONS, TEAM_CODES, TEAM_IDS, cleanEventPatch, cleanFieldValue, defaultReveal, deriveReveal, roomOfTeam, applyTimerAction, roundIsOver, stampsOf, TIMER_ACTIONS } from './logic.ts'
+import { DEFAULT_EVENT, KEY_PATTERN, MISSIONS, TEAM_CODES, TEAM_IDS, cleanEventPatch, cleanFieldValue, defaultReveal, deriveReveal, roomOfTeam, applyTimerAction, roundIsOver, stampsOf, TIMER_ACTIONS, LAST_STEP, freshRun, teamStep, phaseOfStep } from './logic.ts'
 import type { Repo } from './repo.ts'
 
 export type Req = { headers: Record<string, string | undefined>; body: any; ip: string }
@@ -150,15 +150,30 @@ export function createHandler(repo: Repo, env: Env, clock: () => number = Date.n
         await repo.setReveal(['teams', op.team], op.stage ? { stage: op.stage, startedAt: clock() } : null)
         return
       }
-      case 'roomTimer': {
-        // Start, pause, resume, extend or restart one room's timer. Run by the Game Master or by the facilitator of the team in that room.
-        if (!MISSIONS.includes(op.room)) throw bad('Unknown room.')
+      case 'teamTimer': {
+        // Start, pause, resume, extend or restart one team's timer. Run by the Game Master or by that team's facilitator.
+        if (!TEAM_IDS.includes(op.team)) throw bad('Unknown team.')
         if (!TIMER_ACTIONS.includes(op.action)) throw bad('Bad timer action.')
         const extra = op.seconds === undefined ? 60 : op.seconds
         if (!Number.isInteger(extra) || extra < 10 || extra > 600) throw bad('Bad extra time.')
-        const ev = await repo.getEvent()
-        if (!gm && !(await facilitatorMay(sess.team_id, op.room))) throw new HttpError(403, 'Only the Game Master, or the facilitator of the team in that room, can run its timer.')
-        await repo.setRoomTimer(op.room, applyTimerAction((ev as any).roomTimers?.[op.room], op.action, clock(), Number((ev as any).roundSeconds) || 420, extra))
+        if (!gm && !(sess.role === 'facilitator' && sess.team_id === op.team)) throw new HttpError(403, 'Only the Game Master, or the facilitator of that team, can run its timer.')
+        const ev: any = await repo.getEvent()
+        const run = ev.teamRun?.[op.team]
+        if (!run?.timer) throw new HttpError(409, 'This team has no timer running at this step.')
+        await repo.setTeamRun(op.team, { ...run, timer: applyTimerAction(run.timer, op.action, clock(), Number(ev.roundSeconds) || 420, extra) })
+        return
+      }
+      case 'teamStep': {
+        // Move one team to another step. The Game Master can go anywhere. A facilitator can move their own team one step at a time, between the first round and the HQ step.
+        if (!TEAM_IDS.includes(op.team)) throw bad('Unknown team.')
+        if (!Number.isInteger(op.step) || op.step < 0 || op.step > LAST_STEP) throw bad('Bad step.')
+        const ev: any = await repo.getEvent()
+        if (!gm) {
+          if (!(sess.role === 'facilitator' && sess.team_id === op.team)) throw new HttpError(403, 'You can only move your own team.')
+          const now = teamStep(ev, op.team)
+          if (now < 1 || now > 8 || op.step < 1 || op.step > 8 || Math.abs(op.step - now) !== 1) throw new HttpError(403, 'You can move your team one step forward or back, between the first round and HQ.')
+        }
+        await repo.setTeamRun(op.team, freshRun(ev, op.step, clock()))
         return
       }
       case 'revealFlag':

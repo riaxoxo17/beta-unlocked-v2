@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { store } from './store/index.js'
 import { STEPS } from './config.js'
-import { currentRound, roleFor, roomFor, teamPlayers } from './game.js'
+import { currentRound, roleFor, roomFor, teamPlayers, stepOf } from './game.js'
 import { nav } from './router.js'
 
 const Ctx = createContext(null)
@@ -22,17 +22,22 @@ export function GameProvider({ children }) {
 
   const value = useMemo(() => {
     const ev = state.event
-    const stepInfo = STEPS[Math.min(ev.step, STEPS.length - 1)]
+    const auth0 = state.me?.role || null
+    const myTeam = auth0 === 'player' ? state.players[state.me.playerId]?.team || null : auth0 === 'facilitator' ? state.me.teamId : null
+    const myStep = stepOf(ev, myTeam)
+    const stepInfo = STEPS[Math.min(myStep, STEPS.length - 1)]
     const auth = state.me?.role || null
     const me = auth === 'player' ? state.players[state.me.playerId] || null : null
     const teamId = me?.team || null
     const players = teamId ? teamPlayers(state, teamId) : []
     const myIdx = me ? players.findIndex((p) => p.id === me.id) : -1
-    const round = currentRound(ev.step)
+    const round = currentRound(myStep)
     return {
       state,
       ev,
       stepInfo,
+      myStep,
+      myTeam,
       auth,
       me,
       teamId,

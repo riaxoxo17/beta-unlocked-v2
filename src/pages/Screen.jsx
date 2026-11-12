@@ -1,29 +1,28 @@
 import { RoomIcon } from '../components/art.jsx'
 import { useGame } from '../lib/useGame.jsx'
-import { ROOMS, ROOM_ORDER, TEAMS } from '../lib/config.js'
-import { roomFor, stampsOf, rosterOf, timerFor } from '../lib/game.js'
+import { ROOMS, ROOM_ORDER, TEAMS, STEPS } from '../lib/config.js'
+import { roomFor, stampsOf, rosterOf, timerFor, stepOf, stepInfoOf } from '../lib/game.js'
 import { Timer } from '../components/ui.jsx'
 import { useTimerAlerts } from '../lib/time.js'
 import { FinalReveal, RevealOverlay, VaultDoors } from '../components/Vault.jsx'
 
 // Share this page on a Meet/Zoom call or pin it in Gather. It shows what everyone should be looking at.
 export default function Screen() {
-  const { state, ev, stepInfo } = useGame()
-  const phase = stepInfo.phase
-  // Four rooms run four timers, so the shared screen stays quiet during rounds. Players hear their own room.
-  useTimerAlerts(phase === 'round' ? {} : timerFor(ev, phase, null))
+  const { state, ev } = useGame()
+  const steps = TEAMS.map((t) => stepOf(ev, t.id))
+  const same = steps.every((x) => x === steps[0])
+  const stepInfo = STEPS[Math.min(steps[0], STEPS.length - 1)]
+  const phase = same ? stepInfo.phase : 'mixed'
+  // Teams run their own clocks, so the shared screen stays quiet. Players hear their own timer.
   return (
     <div className="stage" data-room="hq" style={{ padding: '24px 4vw 40px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <h1 className="pixel" style={{ fontSize: 'clamp(28px, 4vw, 52px)', fontWeight: 700 }}>
           Betta: Unlocked
         </h1>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 20 }}>
-          <span style={{ fontSize: 'clamp(18px, 2.4vw, 30px)' }} className="muted">
-            {stepInfo.label}
-          </span>
-          {phase !== 'round' && <Timer {...timerFor(ev, phase, null)} size={64} />}
-        </div>
+        <span style={{ fontSize: 'clamp(18px, 2.4vw, 30px)' }} className="muted">
+          {same ? stepInfo.label : 'Each team moves at its own pace'}
+        </span>
       </div>
 
       {phase === 'lobby' && (
@@ -35,11 +34,13 @@ export default function Screen() {
         </div>
       )}
 
-      {(phase === 'round' || phase === 'transition' || phase === 'hq') && (
+      {phase !== 'lobby' && phase !== 'vault' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 18, marginTop: 28 }}>
           {TEAMS.map((t) => {
             const stamps = stampsOf(state, t.id)
-            const roomNow = phase === 'round' ? roomFor(t.id, stepInfo.round) : phase === 'transition' ? roomFor(t.id, stepInfo.round + 1) : null
+            const si = stepInfoOf(ev, t.id)
+            const tp = si.phase
+            const roomNow = tp === 'round' ? roomFor(t.id, si.round) : tp === 'transition' ? roomFor(t.id, si.round + 1) : null
             return (
               <div key={t.id} className="panel" style={{ borderColor: t.color, boxShadow: `0 0 30px ${t.color}33` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -50,16 +51,16 @@ export default function Screen() {
                 <div style={{ margin: '14px 0', fontSize: 20 }}>
                   {roomNow ? (
                     <>
-                      {phase === 'transition' ? 'Heading to ' : ''}
+                      {tp === 'transition' ? 'Heading to ' : ''}
                       <RoomIcon room={roomNow} size={22} /> {ROOMS[roomNow].short}
                     </>
                   ) : (
-                    'At headquarters'
+                    tp === 'vault' ? 'At the identity vault' : 'At headquarters'
                   )}
                 </div>
-                {phase === 'round' && roomNow && (
+                {timerFor(ev, t.id).seconds != null && (
                   <div style={{ margin: '0 0 12px' }}>
-                    <Timer {...timerFor(ev, phase, roomNow)} size={34} />
+                    <Timer {...timerFor(ev, t.id)} size={34} />
                   </div>
                 )}
                 <div style={{ display: 'flex', gap: 8 }} aria-label={`${stamps.length} of 4 stamps`}>

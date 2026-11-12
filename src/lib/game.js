@@ -25,13 +25,12 @@ export function stepDuration(stepIndex, ev) {
   return 0
 }
 
-// The timer a viewer should see: the room's own timer during a round, the shared one for moves and headquarters.
-export function timerFor(ev, phase, room) {
-  if (phase === 'round') {
-    const t = room ? ev.roomTimers?.[room] : null
-    return { endsAt: t?.endsAt ?? null, pausedAt: t?.pausedAt ?? null, seconds: t ? t.seconds : null }
-  }
-  return { endsAt: ev.endsAt ?? null, pausedAt: ev.pausedAt ?? null, seconds: null }
+// Where a team is in the game, and its own timer. Teams without a run follow the shared step.
+export const stepOf = (ev, team) => Number(ev?.teamRun?.[team]?.step ?? ev?.step ?? 0)
+export const stepInfoOf = (ev, team) => STEPS[Math.min(stepOf(ev, team), STEPS.length - 1)]
+export function timerFor(ev, team) {
+  const t = ev?.teamRun?.[team]?.timer
+  return { endsAt: t?.endsAt ?? null, pausedAt: t?.pausedAt ?? null, seconds: t ? t.seconds : null, startedAt: t?.startedAt ?? null }
 }
 
 export function teamPlayers(state, teamId) {

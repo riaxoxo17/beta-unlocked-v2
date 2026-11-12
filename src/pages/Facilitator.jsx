@@ -6,7 +6,7 @@ import { missionSummary, roleFor, roomFor, stampsOf, teamPlayers, timerFor } fro
 import { store } from '../lib/store/index.js'
 import { Btn, ConfirmBtn, Panel, TeamChip, Timer } from '../components/ui.jsx'
 import { TwistPanel } from '../components/Twists.jsx'
-import { RoomTimerControls } from '../components/RoomTimerControls.jsx'
+import { TeamTimerControls, TeamStepMover } from '../components/TeamTimerControls.jsx'
 
 export default function Facilitator() {
   const g = useGame()
@@ -89,6 +89,7 @@ function FacilitatorDashboard({ session, onLogout, game }) {
   const team = TEAMS.find((t) => t.id === session.team)
   const players = teamPlayers(state, session.team)
   const progress = state.teams[session.team]?.progress || {}
+  const stepNow = game.myStep
   const phase = stepInfo.phase
   const room = phase === 'round' ? roomFor(session.team, stepInfo.round) : null
   const stamps = stampsOf(state, session.team)
@@ -117,7 +118,7 @@ function FacilitatorDashboard({ session, onLogout, game }) {
             </div>
             <div style={{ textAlign: 'right' }}>
               <div className="hint">{stepInfo.label}</div>
-              <Timer {...timerFor(ev, stepInfo.phase, room)} size={36} />
+              <Timer {...timerFor(ev, session.team)} size={36} />
             </div>
           </div>
           <p className="muted" style={{ marginBottom: 0, marginTop: 14 }}>
@@ -183,13 +184,30 @@ function FacilitatorDashboard({ session, onLogout, game }) {
         </Panel>
 
         <Panel style={{ borderColor: team.color }}>
+          <h3>Move your team</h3>
+          <p className="muted" style={{ marginTop: 0 }}>
+            Right now: <b>{stepInfo.label}</b>. Move {team.name} on when they are ready. Only your team moves, and its timer restarts at the new step.
+          </p>
+          {phase !== 'round' && timerFor(ev, session.team).seconds != null && (
+            <div style={{ marginBottom: 14 }}>
+              <TeamTimerControls team={session.team} timer={timerFor(ev, session.team)} dispatch={dispatch} size={40} />
+            </div>
+          )}
+          {stepNow >= 1 && stepNow <= 8 ? (
+            <TeamStepMover team={session.team} step={stepNow} dispatch={dispatch} small={false} />
+          ) : (
+            <p className="muted" style={{ margin: 0 }}>{stepNow === 0 ? 'The Game Master starts your team from HQ.' : 'The Game Master moves your team from here.'}</p>
+          )}
+        </Panel>
+
+        <Panel style={{ borderColor: team.color }}>
           <h3>Controls for this room</h3>
           {room ? (
             <>
-              <p className="muted" style={{ marginTop: 0 }}>You can run {team.name} in {ROOMS[room].short} while they are there. The Game Master runs the timer and the other teams.</p>
+              <p className="muted" style={{ marginTop: 0 }}>You can run {team.name} in {ROOMS[room].short} while they are there.</p>
               <div style={{ marginBottom: 16 }}>
                 <div className="label">Timer for {ROOMS[room].short}</div>
-                <RoomTimerControls room={room} timer={timerFor(ev, stepInfo.phase, room)} dispatch={dispatch} size={40} />
+                <TeamTimerControls team={session.team} timer={timerFor(ev, session.team)} dispatch={dispatch} size={40} />
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
                 <Btn variant={stamps.includes(room) ? 'ghost' : undefined} onClick={() => dispatch({ type: 'teamField', team: session.team, mission: room, key: 'stamp', value: stamps.includes(room) ? null : store.now() })}>
@@ -233,7 +251,7 @@ function FacilitatorDashboard({ session, onLogout, game }) {
             <li>Let the players solve the challenge — don't solve it for them!</li>
           </ul>
         </Panel>
-        <p className="hint">Start, pause and timer controls stay with the Game Master.</p>
+        <p className="hint">The Game Master can also move any team and run any timer.</p>
       </main>
     </div>
   )
